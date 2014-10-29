@@ -235,6 +235,40 @@
 
     AVAssetReaderOutput *readerVideoTrackOutput = nil;
     AVAssetReaderOutput *readerAudioTrackOutput = nil;
+    
+    NSArray *audioTracks = [self.asset tracksWithMediaType:AVMediaTypeAudio];
+    BOOL hasAudioTraks = [audioTracks count] > 0;
+    BOOL shouldPlayAudio = hasAudioTraks && (self.volume > 0);
+    
+    if (shouldPlayAudio){
+        audioEncodingIsFinished = NO;
+        
+        // This might need to be extended to handle movies with more than one audio track
+        AVAssetTrack* audioTrack = [audioTracks objectAtIndex:0];
+        NSDictionary *audioReadSettings = [NSDictionary dictionaryWithObjectsAndKeys:
+                                           [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
+                                           [NSNumber numberWithFloat:44100.0], AVSampleRateKey,
+                                           [NSNumber numberWithInt:16], AVLinearPCMBitDepthKey,
+                                           [NSNumber numberWithBool:NO], AVLinearPCMIsNonInterleaved,
+                                           [NSNumber numberWithBool:NO], AVLinearPCMIsFloatKey,
+                                           [NSNumber numberWithBool:NO], AVLinearPCMIsBigEndianKey,
+                                           nil];
+        
+        readerAudioTrackOutput = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:audioTrack outputSettings:audioReadSettings];
+        [reader addOutput:readerAudioTrackOutput];
+        
+        if (shouldPlayAudio){
+            if (audio_queue == nil){
+                audio_queue = dispatch_queue_create("GPUAudioQueue", nil);
+            }
+            
+            if (audioPlayer == nil){
+                audioPlayer = [[GPUImageAudioPlayer alloc] init];
+                [audioPlayer initAudio];
+                [audioPlayer startPlaying];
+            }
+        }
+    }
 
     audioEncodingIsFinished = YES;
     for( AVAssetReaderOutput *output in reader.outputs ) {
@@ -260,6 +294,10 @@
         [synchronizedMovieWriter setVideoInputReadyCallback:^{
             return [weakSelf readNextVideoFrameFromOutput:readerVideoTrackOutput];
         }];
+        
+        [synchronizedMovieWriter setAudioInputReadyCallback:^{
+            return [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
+        }];
 
         [synchronizedMovieWriter setAudioInputReadyCallback:^{
             return [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
@@ -272,6 +310,11 @@
         while (reader.status == AVAssetReaderStatusReading && (!_shouldRepeat || keepLooping))
         {
                 [weakSelf readNextVideoFrameFromOutput:readerVideoTrackOutput];
+            
+            if (audioPlayer.readyForMoreBytes) {
+                //process next audio sample if the player is ready to receive it
+                [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
+            }
 
             if ( (readerAudioTrackOutput) && (!audioEncodingIsFinished) )
             {
@@ -409,6 +452,18 @@
     if (reader.status == AVAssetReaderStatusReading && ! audioEncodingIsFinished)
     {
         CMSampleBufferRef audioSampleBufferRef = [readerAudioTrackOutput copyNextSampleBuffer];
+        
+        if (self.volume > 0){
+            CFRetain(audioSampleBufferRef);
+            dispatch_async(audio_queue, ^{
+                [audioPlayer copyBuffer:audioSampleBufferRef];
+                
+                CMSampleBufferInvalidate(audioSampleBufferRef);
+                CFRelease(audioSampleBufferRef);
+            });
+            
+        }
+        
         if (audioSampleBufferRef)
         {
             //NSLog(@"read an audio frame: %@", CFBridgingRelease(CMTimeCopyDescription(kCFAllocatorDefault, CMSampleBufferGetOutputPresentationTimeStamp(audioSampleBufferRef))));
@@ -694,6 +749,12 @@
     {
         [displayLink invalidate]; // remove from all run loops
         displayLink = nil;
+    }
+    
+    if (audioPlayer != nil)
+    {
+        [audioPlayer stopPlaying];
+        audioPlayer = nil;
     }
 
     if ([self.delegate respondsToSelector:@selector(didCompletePlayingMovie)]) {
