@@ -453,7 +453,8 @@
     {
         CMSampleBufferRef audioSampleBufferRef = [readerAudioTrackOutput copyNextSampleBuffer];
         
-        if (self.volume > 0){
+        if (self.volume > 0 &&
+            audioSampleBufferRef){
             CFRetain(audioSampleBufferRef);
             dispatch_async(audio_queue, ^{
                 [audioPlayer copyBuffer:audioSampleBufferRef];
