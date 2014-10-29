@@ -35,6 +35,10 @@
  */
 @property(readonly, nonatomic) float progress;
 
+/** Volume for audio track.
+ */
+@property(nonatomic, assign) NSUInteger volume;
+
 /** This is used to send the delete Movie did complete playing alert
  */
 @property (readwrite, nonatomic, assign) id <GPUImageMovieDelegate>delegate;
