@@ -2,6 +2,7 @@
 #import "GPUImageMovieWriter.h"
 #import "GPUImageFilter.h"
 #import "GPUImageVideoCamera.h"
+#import "GPUImageAudioPlayer.h"
 
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
 {
@@ -25,6 +26,10 @@
     BOOL isFullYUVRange;
 
     int imageBufferWidth, imageBufferHeight;
+    
+    GPUImageAudioPlayer *audioPlayer;
+    CFAbsoluteTime assetStartTime;
+    dispatch_queue_t audio_queue;
 }
 
 - (void)processAsset;
