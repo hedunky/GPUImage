@@ -456,28 +456,28 @@
         if (self.volume > 0 &&
             audioSampleBufferRef){
             CFRetain(audioSampleBufferRef);
-            
-            
-            if (_playAtActualSpeed)
-            {
-                // Do this outside of the video processing queue to not slow that down while waiting
-                CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(audioSampleBufferRef);
-                CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, previousFrameTime);
-                CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
+
+            dispatch_async(audio_queue, ^{
                 
-                CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
-                CGFloat actualTimeDifference = currentActualTime - previousActualFrameTime;
-                
-                if (frameTimeDifference > actualTimeDifference)
+                if (_playAtActualSpeed)
                 {
-                    usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
+                    // Do this outside of the video processing queue to not slow that down while waiting
+                    CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(audioSampleBufferRef);
+                    CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, previousFrameTime);
+                    CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
+                    
+                    CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
+                    CGFloat actualTimeDifference = currentActualTime - previousActualFrameTime;
+                    
+                    if (frameTimeDifference > actualTimeDifference)
+                    {
+                        usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
+                    }
+                    
+                    previousFrameTime = currentSampleTime;
+                    previousActualFrameTime = CFAbsoluteTimeGetCurrent();
                 }
                 
-                previousFrameTime = currentSampleTime;
-                previousActualFrameTime = CFAbsoluteTimeGetCurrent();
-            }
-            
-            dispatch_async(audio_queue, ^{
                 [audioPlayer copyBuffer:audioSampleBufferRef];
                 
                 CMSampleBufferInvalidate(audioSampleBufferRef);
