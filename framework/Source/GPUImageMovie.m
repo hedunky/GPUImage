@@ -2,7 +2,6 @@
 #import "GPUImageMovieWriter.h"
 #import "GPUImageFilter.h"
 #import "GPUImageVideoCamera.h"
-#import "GPUImageAudioPlayer.h"
 
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
 {
@@ -27,11 +26,12 @@
 
     int imageBufferWidth, imageBufferHeight;
     
-    GPUImageAudioPlayer *audioPlayer;
-    CFAbsoluteTime assetStartTime;
-    dispatch_queue_t audio_queue;
+    AVAudioPlayer *audioPlayer;
+    CFAbsoluteTime startActualFrameTime;
+    CGFloat currentVideoTime;
 }
 
+- (void)setupSound;
 - (void)processAsset;
 
 @end
@@ -168,6 +168,8 @@
       return;
     }
     
+    [self setupSound];
+    
     if (_shouldRepeat) keepLooping = YES;
     
     previousFrameTime = kCMTimeZero;
@@ -229,6 +231,17 @@
     return assetReader;
 }
 
+- (void)setupSound
+{
+    NSError *error;
+    audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:self.url error:&error];
+    
+    if (error) {
+        NSLog(@"Failed to initialise sound with error:%@",error);
+    }
+    [audioPlayer prepareToPlay];
+}
+
 - (void)processAsset
 {
     reader = [self createAssetReader];
@@ -257,17 +270,8 @@
         readerAudioTrackOutput = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:audioTrack outputSettings:audioReadSettings];
         [reader addOutput:readerAudioTrackOutput];
         
-        if (shouldPlayAudio){
-            if (audio_queue == nil){
-                audio_queue = dispatch_queue_create("GPUAudioQueue", nil);
-            }
-            
-            if (audioPlayer == nil){
-                audioPlayer = [[GPUImageAudioPlayer alloc] init];
-                [audioPlayer initAudio];
-                [audioPlayer startPlaying];
-            }
-        }
+        [audioPlayer setCurrentTime:currentVideoTime];
+        [audioPlayer play];
     }
 
     audioEncodingIsFinished = YES;
@@ -309,12 +313,7 @@
     {
         while (reader.status == AVAssetReaderStatusReading && (!_shouldRepeat || keepLooping))
         {
-                [weakSelf readNextVideoFrameFromOutput:readerVideoTrackOutput];
-            
-            if (audioPlayer.readyForMoreBytes) {
-                //process next audio sample if the player is ready to receive it
-                [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
-            }
+            [weakSelf readNextVideoFrameFromOutput:readerVideoTrackOutput];
 
             if ( (readerAudioTrackOutput) && (!audioEncodingIsFinished) )
             {
@@ -399,20 +398,22 @@
         CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
         if (sampleBufferRef) 
         {
-            //NSLog(@"read a video frame: %@", CFBridgingRelease(CMTimeCopyDescription(kCFAllocatorDefault, CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef))));
-            if (_playAtActualSpeed)
+             if (_playAtActualSpeed)
             {
-                // Do this outside of the video processing queue to not slow that down while waiting
                 CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef);
-                CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, previousFrameTime);
+                //NSLog(@"read a video frame: %@", CFBridgingRelease(CMTimeCopyDescription(kCFAllocatorDefault, CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef))));
+ 
+                // Do this outside of the video processing queue to not slow that down while waiting
                 CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
                 
-                CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
-                CGFloat actualTimeDifference = currentActualTime - previousActualFrameTime;
+                CGFloat frameTimeOffset= CMTimeGetSeconds(currentSampleTime);
+                CGFloat actualTimeOffset = currentActualTime - startActualFrameTime;
                 
-                if (frameTimeDifference > actualTimeDifference)
+                actualTimeOffset = [audioPlayer currentTime];
+                
+                if (frameTimeOffset - actualTimeOffset > 0.0f)
                 {
-                    usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
+                    usleep(1000000.0 * (frameTimeOffset - actualTimeOffset));
                 }
                 
                 previousFrameTime = currentSampleTime;
@@ -452,38 +453,6 @@
     if (reader.status == AVAssetReaderStatusReading && ! audioEncodingIsFinished)
     {
         CMSampleBufferRef audioSampleBufferRef = [readerAudioTrackOutput copyNextSampleBuffer];
-        
-        if (self.volume > 0 &&
-            audioSampleBufferRef){
-            CFRetain(audioSampleBufferRef);
-
-            dispatch_async(audio_queue, ^{
-                
-                if (_playAtActualSpeed)
-                {
-                    // Do this outside of the video processing queue to not slow that down while waiting
-                    CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(audioSampleBufferRef);
-                    CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, previousFrameTime);
-                    CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
-                    
-                    CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
-                    CGFloat actualTimeDifference = currentActualTime - previousActualFrameTime;
-                    
-                    if (frameTimeDifference > actualTimeDifference)
-                    {
-                        usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
-                    }
-                    
-                    previousFrameTime = currentSampleTime;
-                    previousActualFrameTime = CFAbsoluteTimeGetCurrent();
-                }
-                
-                [audioPlayer copyBuffer:audioSampleBufferRef];
-                
-                CMSampleBufferInvalidate(audioSampleBufferRef);
-                CFRelease(audioSampleBufferRef);
-            });
-        }
         
         if (audioSampleBufferRef)
         {
@@ -754,6 +723,7 @@
 {
     keepLooping = NO;
     [displayLink setPaused:YES];
+    [audioPlayer stop];
 
     for (id<GPUImageInput> currentTarget in targets)
     {
@@ -770,12 +740,6 @@
     {
         [displayLink invalidate]; // remove from all run loops
         displayLink = nil;
-    }
-    
-    if (audioPlayer != nil)
-    {
-        [audioPlayer stopPlaying];
-        audioPlayer = nil;
     }
 
     if ([self.delegate respondsToSelector:@selector(didCompletePlayingMovie)]) {
