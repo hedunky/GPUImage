@@ -235,6 +235,7 @@
 {
     NSError *error;
     audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:self.url error:&error];
+    audioPlayer.volume = self.volume;
     
     if (error) {
         NSLog(@"Failed to initialise sound with error:%@",error);
@@ -807,6 +808,15 @@
 
 - (BOOL)videoEncodingIsFinished {
     return videoEncodingIsFinished;
+}
+
+- (void)setVolume:(NSUInteger)volume
+{
+    _volume = volume;
+    if (audioPlayer)
+    {
+        audioPlayer.volume = volume;
+    }
 }
 
 @end
