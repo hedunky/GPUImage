@@ -285,8 +285,8 @@
         }
     }
     
-    if (reader.status == AVAssetReaderStatusReading &&
-        reader.status == AVAssetReaderStatusCancelled &&
+    if (reader.status != AVAssetReaderStatusReading &&
+        reader.status != AVAssetReaderStatusCancelled &&
         [reader startReading] == NO)
     {
         NSLog(@"Error reading from file at URL: %@", self.url);
