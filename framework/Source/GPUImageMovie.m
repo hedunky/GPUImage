@@ -253,7 +253,7 @@
     BOOL hasAudioTraks = [audioTracks count] > 0;
     BOOL shouldPlayAudio = hasAudioTraks && (self.volume > 0);
     
-    if (shouldPlayAudio){
+    if (shouldPlayAudio && reader.status != AVAssetReaderStatusReading){
         audioEncodingIsFinished = NO;
         
         // This might need to be extended to handle movies with more than one audio track
