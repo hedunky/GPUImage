@@ -398,7 +398,7 @@
     if (reader.status == AVAssetReaderStatusReading && ! videoEncodingIsFinished && readerVideoTrackOutput)
     {
         CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
-        if (sampleBufferRef)
+        if (sampleBufferRef != NULL)
         {
             if (_playAtActualSpeed)
             {
