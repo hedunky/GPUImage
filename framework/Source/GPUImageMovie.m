@@ -290,8 +290,10 @@
         )
     {
         if([self.reader startReading] == NO)
+        {
             NSLog(@"Error reading from file at URL: %@", self.url);
-        return;
+            return;
+        }
     }
     
     __unsafe_unretained GPUImageMovie *weakSelf = self;
