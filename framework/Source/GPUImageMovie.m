@@ -46,11 +46,6 @@
 
 @implementation GPUImageMovie
 
-@synthesize runBenchmark = _runBenchmark;
-@synthesize playAtActualSpeed = _playAtActualSpeed;
-@synthesize delegate = _delegate;
-@synthesize shouldRepeat = _shouldRepeat;
-
 #pragma mark -
 #pragma mark Initialization and teardown
 
