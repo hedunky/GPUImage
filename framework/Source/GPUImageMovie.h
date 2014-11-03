@@ -50,7 +50,6 @@
 - (id)initWithAsset:(AVAsset *)asset;
 - (id)initWithPlayerItem:(AVPlayerItem *)playerItem;
 - (id)initWithURL:(NSURL *)url;
-- (void)yuvConversionSetup;
 
 - (void)setURL:(NSURL *)url;
 

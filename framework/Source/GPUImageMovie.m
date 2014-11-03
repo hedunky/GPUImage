@@ -42,6 +42,8 @@
 - (void)setupSound;
 - (void)processAsset;
 
+- (void)yuvConversionSetup;
+
 @end
 
 @implementation GPUImageMovie
