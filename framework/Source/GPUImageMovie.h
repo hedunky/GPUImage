@@ -16,7 +16,6 @@
 
 @property (readwrite, retain) AVAsset *asset;
 @property (readwrite, retain) AVPlayerItem *playerItem;
-@property(readwrite, retain) NSURL *url;
 
 /** This enables the benchmarking mode, which logs out instantaneous and average frame times to the console
  */
@@ -31,7 +30,7 @@
 @property(readwrite, nonatomic) BOOL shouldRepeat;
 
 /** This specifies the progress of the process on a scale from 0 to 1.0. A value of 0 means the process has not yet begun, A value of 1.0 means the conversaion is complete.
-    This property is not key-value observable.
+ This property is not key-value observable.
  */
 @property(readonly, nonatomic) float progress;
 
@@ -53,6 +52,8 @@
 - (id)initWithURL:(NSURL *)url;
 - (void)yuvConversionSetup;
 
+- (void)setURL:(NSURL *)url;
+
 /// @name Movie processing
 - (void)enableSynchronizedEncodingUsingMovieWriter:(GPUImageMovieWriter *)movieWriter;
 - (BOOL)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
@@ -60,6 +61,6 @@
 - (void)startProcessing;
 - (void)endProcessing;
 - (void)cancelProcessing;
-- (void)processMovieFrame:(CMSampleBufferRef)movieSampleBuffer; 
+- (void)processMovieFrame:(CMSampleBufferRef)movieSampleBuffer;
 
 @end

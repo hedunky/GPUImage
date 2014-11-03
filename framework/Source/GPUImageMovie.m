@@ -64,9 +64,7 @@
     }
     
     [self yuvConversionSetup];
-    
-    self.url = url;
-    self.asset = nil;
+    [self setUrl: url];
     
     return self;
 }
@@ -79,9 +77,7 @@
     }
     
     [self yuvConversionSetup];
-    
-    self.url = nil;
-    self.asset = asset;
+    [self setAsset: asset];
     
     return self;
 }
@@ -100,6 +96,17 @@
     self.playerItem = playerItem;
     
     return self;
+}
+
+- (void)setUrl:(NSURL *)url
+{
+    AVURLAsset *newAsset = [[AVURLAsset alloc] init];
+    self.asset = newAsset;
+}
+
+- (void)setAsset:(AVAsset *)asset
+{
+    
 }
 
 - (void)yuvConversionSetup;
