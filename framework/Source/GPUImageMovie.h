@@ -14,7 +14,6 @@
  */
 @interface GPUImageMovie : GPUImageOutput
 
-@property (readwrite, retain) AVAsset *asset;
 @property (readwrite, retain) AVPlayerItem *playerItem;
 
 /** This enables the benchmarking mode, which logs out instantaneous and average frame times to the console
@@ -52,6 +51,7 @@
 - (id)initWithURL:(NSURL *)url;
 
 - (void)setURL:(NSURL *)url;
+- (void)setAsset:(AVAsset *)asset;
 
 /// @name Movie processing
 - (void)enableSynchronizedEncodingUsingMovieWriter:(GPUImageMovieWriter *)movieWriter;

@@ -48,8 +48,6 @@
 
 @implementation GPUImageMovie
 
-@synthesize url = _url;
-@synthesize asset = _asset;
 @synthesize runBenchmark = _runBenchmark;
 @synthesize playAtActualSpeed = _playAtActualSpeed;
 @synthesize delegate = _delegate;
@@ -66,7 +64,7 @@
     }
     
     [self yuvConversionSetup];
-    [self setUrl: url];
+    [self setURL: url];
     
     return self;
 }
@@ -92,18 +90,15 @@
     }
     
     [self yuvConversionSetup];
-    
-    self.url = nil;
-    self.asset = nil;
-    self.playerItem = playerItem;
+    [self setPlayerItem: playerItem];
     
     return self;
 }
 
-- (void)setUrl:(NSURL *)url
+- (void)setURL:(NSURL *)url
 {
     AVURLAsset *newAsset = [[AVURLAsset alloc] init];
-    self.asset = newAsset;
+    [self setAsset: newAsset];
 }
 
 - (void)setAsset:(AVAsset *)asset
@@ -170,11 +165,11 @@
         [self processPlayerItem];
         return;
     }
-    if(self.url == nil)
-    {
-        [self processAsset];
-        return;
-    }
+//    if(self.url == nil)
+//    {
+//        [self processAsset];
+//        return;
+//    }
     
     [self setupSound];
     
