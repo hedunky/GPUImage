@@ -5,7 +5,7 @@
 
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
 {
-    const GLfloat *_preferredConversion;
+    const GLfloat *preferredConversion;
 }
 
 @property (nonatomic, assign) BOOL audioEncodingIsFinished;
@@ -109,10 +109,11 @@
 {
     if ([GPUImageContext supportsFastTextureUpload])
     {
-        runSynchronouslyOnVideoProcessingQueue(^{
+        runSynchronouslyOnVideoProcessingQueue(^
+        {
             [GPUImageContext useImageProcessingContext];
             
-            _preferredConversion = kColorConversion709;
+            preferredConversion = kColorConversion709;
             self.isFullYUVRange       = YES;
             self.yuvConversionProgram = [[GPUImageContext sharedImageProcessingContext] programForVertexShaderString:kGPUImageVertexShaderString fragmentShaderString:kGPUImageYUVFullRangeConversionForLAFragmentShaderString];
             
@@ -534,27 +535,27 @@
         {
             if (self.isFullYUVRange)
             {
-                _preferredConversion = kColorConversion601FullRange;
+                preferredConversion = kColorConversion601FullRange;
             }
             else
             {
-                _preferredConversion = kColorConversion601;
+                preferredConversion = kColorConversion601;
             }
         }
         else
         {
-            _preferredConversion = kColorConversion709;
+            preferredConversion = kColorConversion709;
         }
     }
     else
     {
         if (self.isFullYUVRange)
         {
-            _preferredConversion = kColorConversion601FullRange;
+            preferredConversion = kColorConversion601FullRange;
         }
         else
         {
-            _preferredConversion = kColorConversion601;
+            preferredConversion = kColorConversion601;
         }
         
     }
@@ -798,7 +799,7 @@
     glBindTexture(GL_TEXTURE_2D, self.chrominanceTexture);
     glUniform1i(self.yuvConversionChrominanceTextureUniform, 5);
     
-    glUniformMatrix3fv(self.yuvConversionMatrixUniform, 1, GL_FALSE, _preferredConversion);
+    glUniformMatrix3fv(self.yuvConversionMatrixUniform, 1, GL_FALSE, preferredConversion);
     
     glVertexAttribPointer(self.yuvConversionPositionAttribute, 2, GL_FLOAT, 0, 0, squareVertices);
     glVertexAttribPointer(self.yuvConversionTextureCoordinateAttribute, 2, GL_FLOAT, 0, 0, textureCoordinates);
