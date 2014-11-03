@@ -39,6 +39,8 @@
 @property (nonatomic, assign) CFAbsoluteTime startActualFrameTime;
 @property (nonatomic, assign) CGFloat currentVideoTime;
 
+- (void)preparePlayerItem;
+
 - (void)setupSound;
 - (void)processAsset;
 
@@ -107,6 +109,15 @@
     _playerItem = playerItem;
     
     [self didChangeValueForKey:@"playerItem"];
+    
+    if (_playerItem)
+    {
+        [self preparePlayerItem];
+    }
+}
+
+- (void)preparePlayerItem
+{
 }
 
 - (void)yuvConversionSetup;
