@@ -14,24 +14,24 @@
  */
 @interface GPUImageMovie : GPUImageOutput
 
-@property (readwrite, retain) AVPlayerItem *playerItem;
+@property (readwrite, retain, nonatomic) AVPlayerItem *playerItem;
 
 /** This enables the benchmarking mode, which logs out instantaneous and average frame times to the console
  */
-@property(readwrite, nonatomic) BOOL runBenchmark;
+@property(readwrite, nonatomic, nonatomic) BOOL runBenchmark;
 
 /** This determines whether to play back a movie as fast as the frames can be processed, or if the original speed of the movie should be respected. Defaults to NO.
  */
-@property(readwrite, nonatomic) BOOL playAtActualSpeed;
+@property(readwrite, nonatomic, nonatomic) BOOL playAtActualSpeed;
 
 /** This determines whether the video should repeat (loop) at the end and restart from the beginning. Defaults to NO.
  */
-@property(readwrite, nonatomic) BOOL shouldRepeat;
+@property(readwrite, nonatomic, nonatomic) BOOL shouldRepeat;
 
 /** This specifies the progress of the process on a scale from 0 to 1.0. A value of 0 means the process has not yet begun, A value of 1.0 means the conversaion is complete.
  This property is not key-value observable.
  */
-@property(readonly, nonatomic) float progress;
+@property(readonly, nonatomic, nonatomic) float progress;
 
 /** Volume for audio track.
  */

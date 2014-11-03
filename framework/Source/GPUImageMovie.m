@@ -100,6 +100,15 @@
     [self setPlayerItem:newItem];
 }
 
+- (void)setPlayerItem:(AVPlayerItem *)playerItem
+{
+    [self willChangeValueForKey:@"playerItem"];
+    
+    _playerItem = playerItem;
+    
+    [self didChangeValueForKey:@"playerItem"];
+}
+
 - (void)yuvConversionSetup;
 {
     if ([GPUImageContext supportsFastTextureUpload])
