@@ -5,6 +5,7 @@
 //  Created by Uzi Refaeli on 03/09/2013.
 //  Copyright (c) 2013 Brad Larson. All rights reserved.
 //
+// TODO: Find replacement for AudioSampleType that works.
 
 #import "GPUImageAudioPlayer.h"
 #define kOutputBus 0
