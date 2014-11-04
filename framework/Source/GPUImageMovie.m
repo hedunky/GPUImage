@@ -35,7 +35,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @property (nonatomic, assign) GLint yuvConversionChrominanceTextureUniform;
 @property (nonatomic, assign) GLint yuvConversionMatrixUniform;
 
-@property (nonatomic, assign) BOOL isFullYUVRange;
 @property (nonatomic, assign) int imageBufferWidth;
 @property (nonatomic, assign) int imageBufferHeight;
 
@@ -140,8 +139,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     
     NSMutableDictionary *videoOutputSettings = [NSMutableDictionary dictionary];
     [videoOutputSettings setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
-    
-    self.isFullYUVRange = YES;
     
     self.videoOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeVideo][0]
                                                                        outputSettings:videoOutputSettings];
@@ -260,18 +257,18 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         return;
     }
     
-    CMSampleBufferRef audioSampleBufferRef = [readerAudioTrackOutput copyNextSampleBuffer];
-    if (audioSampleBufferRef)
+    CMSampleBufferRef sampleBufferRef = [readerAudioTrackOutput copyNextSampleBuffer];
+    if (sampleBufferRef)
     {
-        CFRetain(audioSampleBufferRef);
+        CFRetain(sampleBufferRef);
         dispatch_async(self.audio_queue, ^
                        {
-                           [self.audioPlayer copyBuffer:audioSampleBufferRef];
+                           [self.audioPlayer copyBuffer:sampleBufferRef];
                            
-                           CMSampleBufferInvalidate(audioSampleBufferRef);
-                           CFRelease(audioSampleBufferRef);
+                           CMSampleBufferInvalidate(sampleBufferRef);
+                           CFRelease(sampleBufferRef);
                        });
-        CFRelease(audioSampleBufferRef);
+        CFRelease(sampleBufferRef);
     }
 }
 
@@ -284,7 +281,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
                                                    [GPUImageContext useImageProcessingContext];
                                                    
                                                    preferredConversion = kColorConversion709;
-                                                   self.isFullYUVRange       = YES;
                                                    self.yuvConversionProgram = [[GPUImageContext sharedImageProcessingContext] programForVertexShaderString:kGPUImageVertexShaderString fragmentShaderString:kGPUImageYUVFullRangeConversionForLAFragmentShaderString];
                                                    
                                                    if (!self.yuvConversionProgram.initialized)
@@ -382,14 +378,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     {
         if(CFStringCompare(colorAttachments, kCVImageBufferYCbCrMatrix_ITU_R_601_4, 0) == kCFCompareEqualTo)
         {
-            if (self.isFullYUVRange)
-            {
-                preferredConversion = kColorConversion601FullRange;
-            }
-            else
-            {
-                preferredConversion = kColorConversion601;
-            }
+            preferredConversion = kColorConversion601FullRange;
         }
         else
         {
@@ -398,15 +387,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     }
     else
     {
-        if (self.isFullYUVRange)
-        {
-            preferredConversion = kColorConversion601FullRange;
-        }
-        else
-        {
-            preferredConversion = kColorConversion601;
-        }
-        
+        preferredConversion = kColorConversion601FullRange;
     }
     
     // Fix issue 1580
