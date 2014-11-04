@@ -10,8 +10,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     const GLfloat *preferredConversion;
 }
 
-@property (nonatomic, assign) BOOL videoEncodingIsFinished;
-
 @property (nonatomic, strong) AVPlayerItem *playerItem;
 @property (nonatomic, strong) AVAssetReader *assetReader;
 @property (nonatomic, strong) AVAssetReaderTrackOutput *ouputTrack;
@@ -169,6 +167,11 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     self.displayLink.paused = NO;
 }
 
+- (void)videoFinish
+{
+    
+}
+
 - (void)play
 {
     self.displayLink.paused = YES;
@@ -178,54 +181,35 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     [self prepareForPlayback];
 }
 
-- (BOOL)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
+- (void)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
 {
-    if (self.assetReader.status == AVAssetReaderStatusReading &&
-        !self.videoEncodingIsFinished)
+    CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
+    if (sampleBufferRef)
     {
-        CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
-        if (sampleBufferRef)
+        // Do this outside of the video processing queue to not slow that down while waiting
+        // TODO: Update code to rely on more performant model.
+        CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef);
+        CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, self.previousFrameTime);
+        CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
+        
+        CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
+        CGFloat actualTimeDifference = currentActualTime - self.previousActualFrameTime;
+        
+        if (frameTimeDifference > actualTimeDifference)
         {
-            if (_playAtActualSpeed)
-            {
-                // Do this outside of the video processing queue to not slow that down while waiting
-                CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef);
-                CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, self.previousFrameTime);
-                CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
-                
-                CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
-                CGFloat actualTimeDifference = currentActualTime - self.previousActualFrameTime;
-                
-                if (frameTimeDifference > actualTimeDifference)
-                {
-                    usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
-                }
-                
-                self.previousFrameTime = currentSampleTime;
-                self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
-            }
-            
-            __unsafe_unretained GPUImageMovie *weakSelf = self;
-            runSynchronouslyOnVideoProcessingQueue(^{
-                [weakSelf processMovieFrame:sampleBufferRef];
-                CMSampleBufferInvalidate(sampleBufferRef);
-                CFRelease(sampleBufferRef);
-            });
-            
-            return YES;
+            usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
         }
-        else
-        {
-            if (!self.shouldRepeat)
-            {
-                self.videoEncodingIsFinished = YES;
-                if( self.videoEncodingIsFinished && self.audioEncodingIsFinished )
-                    [self endProcessing];
-            }
-        }
+        
+        self.previousFrameTime = currentSampleTime;
+        self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
+        
+        __unsafe_unretained GPUImageMovie *weakSelf = self;
+        runSynchronouslyOnVideoProcessingQueue(^{
+            [weakSelf processMovieFrame:sampleBufferRef];
+            CMSampleBufferInvalidate(sampleBufferRef);
+            CFRelease(sampleBufferRef);
+        });
     }
-    
-    return NO;
 }
 
 - (void)yuvConversionSetup;
@@ -276,7 +260,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
 - (void)displayLinkCallback:(CADisplayLink *)sender
 {
-    
     switch (self.assetReader.status)
     {
         case AVAssetReaderStatusReading:

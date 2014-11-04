@@ -18,10 +18,6 @@
  */
 @property(readwrite, nonatomic, nonatomic) BOOL runBenchmark;
 
-/** This determines whether to play back a movie as fast as the frames can be processed, or if the original speed of the movie should be respected. Defaults to NO.
- */
-@property(readwrite, nonatomic, nonatomic) BOOL playAtActualSpeed;
-
 /** This determines whether the video should repeat (loop) at the end and restart from the beginning. Defaults to NO.
  */
 @property(readwrite, nonatomic, nonatomic) BOOL shouldRepeat;
@@ -33,10 +29,6 @@
 /** This is used to send the delete Movie did complete playing alert
  */
 @property (readwrite, nonatomic, assign) id <GPUImageMovieDelegate>delegate;
-
-@property (readonly, nonatomic) AVAssetReader *assetReader;
-@property (readonly, nonatomic) BOOL audioEncodingIsFinished;
-@property (readonly, nonatomic) BOOL videoEncodingIsFinished;
 
 /// @name Initialization and teardown
 - (id)initWithURL:(NSURL *)url;
