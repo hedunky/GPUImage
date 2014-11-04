@@ -42,7 +42,6 @@
 - (void)preparePlayerItem;
 
 - (void)setupSound;
-- (void)processAsset;
 
 @end
 
@@ -118,6 +117,27 @@
 
 - (void)preparePlayerItem
 {
+    runSynchronouslyOnVideoProcessingQueue(^
+    {
+        self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
+        [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+        [self.displayLink setPaused:YES];
+        
+        dispatch_queue_t videoProcessingQueue = [GPUImageContext sharedContextQueue];
+        NSMutableDictionary *pixBuffAttributes = [NSMutableDictionary dictionary];
+        if ([GPUImageContext supportsFastTextureUpload]) {
+            [pixBuffAttributes setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
+        }
+        else {
+            [pixBuffAttributes setObject:@(kCVPixelFormatType_32BGRA) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
+        }
+        
+        self.playerItemOutput = [[AVPlayerItemVideoOutput alloc] initWithPixelBufferAttributes:pixBuffAttributes];
+        [self.playerItemOutput setDelegate:self queue:videoProcessingQueue];
+        
+        [self.playerItem addOutput:self.playerItemOutput];
+        [self.playerItemOutput requestNotificationOfMediaDataChangeWithAdvanceInterval:0.1];
+    });
 }
 
 - (void)yuvConversionSetup;
@@ -176,15 +196,6 @@
 - (void)startProcessing
 {
 //    [self endProcessing];
-//    if( self.playerItem ) {
-//        [self processPlayerItem];
-//        return;
-//    }
-////    if(self.url == nil)
-////    {
-////        [self processAsset];
-////        return;
-////    }
 //    
 //    [self setupSound];
 //    
@@ -260,131 +271,6 @@
 //        NSLog(@"Failed to initialise sound with error:%@",error);
 //    }
 //    [self.audioPlayer prepareToPlay];
-}
-
-- (void)processAsset
-{
-//    self.reader = [self createAssetReader];
-//    
-//    AVAssetReaderOutput *readerVideoTrackOutput = nil;
-//    AVAssetReaderOutput *readerAudioTrackOutput = nil;
-//    
-//    NSArray *audioTracks = [self.asset tracksWithMediaType:AVMediaTypeAudio];
-//    BOOL hasAudioTraks = [audioTracks count] > 0;
-//    BOOL shouldPlayAudio = hasAudioTraks && (self.volume > 0);
-//    
-//    if (shouldPlayAudio && self.reader.status != AVAssetReaderStatusReading){
-//        self.audioEncodingIsFinished = NO;
-//        
-//        // This might need to be extended to handle movies with more than one audio track
-//        AVAssetTrack* audioTrack = [audioTracks objectAtIndex:0];
-//        NSDictionary *audioReadSettings = [NSDictionary dictionaryWithObjectsAndKeys:
-//                                           [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
-//                                           [NSNumber numberWithFloat:44100.0], AVSampleRateKey,
-//                                           [NSNumber numberWithInt:16], AVLinearPCMBitDepthKey,
-//                                           [NSNumber numberWithBool:NO], AVLinearPCMIsNonInterleaved,
-//                                           [NSNumber numberWithBool:NO], AVLinearPCMIsFloatKey,
-//                                           [NSNumber numberWithBool:NO], AVLinearPCMIsBigEndianKey,
-//                                           nil];
-//        
-//        readerAudioTrackOutput = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:audioTrack outputSettings:audioReadSettings];
-//        [self.reader addOutput:readerAudioTrackOutput];
-//        
-//        [self.audioPlayer setCurrentTime:self.currentVideoTime];
-//        [self.audioPlayer play];
-//    }
-//    
-//    self.audioEncodingIsFinished = YES;
-//    for( AVAssetReaderOutput *output in self.reader.outputs ) {
-//        if( [output.mediaType isEqualToString:AVMediaTypeAudio] ) {
-//            self.audioEncodingIsFinished = NO;
-//            readerAudioTrackOutput = output;
-//        }
-//        else if( [output.mediaType isEqualToString:AVMediaTypeVideo] ) {
-//            readerVideoTrackOutput = output;
-//        }
-//    }
-//    
-//    if (self.reader.status != AVAssetReaderStatusReading &&
-//        self.reader.status != AVAssetReaderStatusCancelled
-//        )
-//    {
-//        if([self.reader startReading] == NO)
-//        {
-//            NSLog(@"Error reading from file at URL: %@", self.url);
-//            return;
-//        }
-//    }
-//    
-//    __unsafe_unretained GPUImageMovie *weakSelf = self;
-//    
-//    if (self.synchronizedMovieWriter != nil)
-//    {
-//        [self.synchronizedMovieWriter setVideoInputReadyCallback:^{
-//            return [weakSelf readNextVideoFrameFromOutput:readerVideoTrackOutput];
-//        }];
-//        
-//        [self.synchronizedMovieWriter setAudioInputReadyCallback:^{
-//            return [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
-//        }];
-//        
-//        [self.synchronizedMovieWriter setAudioInputReadyCallback:^{
-//            return [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
-//        }];
-//        
-//        [self.synchronizedMovieWriter enableSynchronizationCallbacks];
-//    }
-//    else
-//    {
-//        while (self.reader.status == AVAssetReaderStatusReading && (!_shouldRepeat || self.keepLooping))
-//        {
-//            [weakSelf readNextVideoFrameFromOutput:readerVideoTrackOutput];
-//            
-//            if ( (readerAudioTrackOutput) && (!self.audioEncodingIsFinished) )
-//            {
-//                [weakSelf readNextAudioSampleFromOutput:readerAudioTrackOutput];
-//            }
-//            
-//        }
-//        
-//        if (self.reader.status == AVAssetReaderStatusCompleted) {
-//            
-//            [self.reader cancelReading];
-//            
-//            if (self.keepLooping) {
-//                self.reader = nil;
-//                dispatch_async(dispatch_get_main_queue(), ^{
-//                    [self startProcessing];
-//                });
-//            } else {
-//                [weakSelf endProcessing];
-//            }
-//            
-//        }
-//    }
-}
-
-- (void)processPlayerItem
-{
-    runSynchronouslyOnVideoProcessingQueue(^{
-        self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
-        [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-        [self.displayLink setPaused:YES];
-        
-        dispatch_queue_t videoProcessingQueue = [GPUImageContext sharedContextQueue];
-        NSMutableDictionary *pixBuffAttributes = [NSMutableDictionary dictionary];
-        if ([GPUImageContext supportsFastTextureUpload]) {
-            [pixBuffAttributes setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
-        }
-        else {
-            [pixBuffAttributes setObject:@(kCVPixelFormatType_32BGRA) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
-        }
-        self.playerItemOutput = [[AVPlayerItemVideoOutput alloc] initWithPixelBufferAttributes:pixBuffAttributes];
-        [self.playerItemOutput setDelegate:self queue:videoProcessingQueue];
-        
-        [_playerItem addOutput:self.playerItemOutput];
-        [self.playerItemOutput requestNotificationOfMediaDataChangeWithAdvanceInterval:0.1];
-    });
 }
 
 - (void)outputMediaDataWillChange:(AVPlayerItemOutput *)sender
