@@ -2,6 +2,7 @@
 #import "GPUImageMovieWriter.h"
 #import "GPUImageFilter.h"
 #import "GPUImageVideoCamera.h"
+#import "GPUImageAudioPlayer.h"
 
 static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
@@ -11,6 +12,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 }
 
 @property (nonatomic, assign) dispatch_queue_t audio_queue;
+@property (nonatomic, strong) GPUImageAudioPlayer *audioPlayer;
 
 @property (nonatomic, strong) AVPlayerItem *playerItem;
 @property (nonatomic, strong) AVAssetReader *assetReader;
@@ -81,11 +83,17 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     return _audio_queue;
 }
 
-//if (audioPlayer == nil){
-//    audioPlayer = [[GPUImageAudioPlayer alloc] init];
-//    [audioPlayer initAudio];
-//    [audioPlayer startPlaying];
-//}
+- (GPUImageAudioPlayer *)audioPlayer
+{
+    if (!_audioPlayer)
+    {
+        _audioPlayer = [[GPUImageAudioPlayer alloc] init];
+        [_audioPlayer initAudio];
+        [_audioPlayer startPlaying];
+    }
+    
+    return _audioPlayer;
+}
 
 - (void)setURL:(NSURL *)url
 {
@@ -247,7 +255,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
 - (void)readNextAudioSampleFromOutput:(AVAssetReaderTrackOutput *)readerAudioTrackOutput
 {
-    if (false)
+    if (!self.audioPlayer.readyForMoreBytes)
     {
         return;
     }
@@ -258,7 +266,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         CFRetain(audioSampleBufferRef);
         dispatch_async(self.audio_queue, ^
                        {
-                           //[audioPlayer copyBuffer:audioSampleBufferRef];
+                           [self.audioPlayer copyBuffer:audioSampleBufferRef];
                            
                            CMSampleBufferInvalidate(audioSampleBufferRef);
                            CFRelease(audioSampleBufferRef);
