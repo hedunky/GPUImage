@@ -10,10 +10,14 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     const GLfloat *preferredConversion;
 }
 
+@property (nonatomic, assign) dispatch_queue_t audio_queue;
+
 @property (nonatomic, strong) AVPlayerItem *playerItem;
 @property (nonatomic, strong) AVAssetReader *assetReader;
-@property (nonatomic, strong) AVAssetReaderTrackOutput *ouputTrack;
 @property (nonatomic, strong) CADisplayLink *displayLink;
+
+@property (nonatomic, strong) AVAssetReaderTrackOutput *videoOutputTrack;
+@property (nonatomic, strong) AVAssetReaderTrackOutput *audioOutputTrack;
 
 @property (nonatomic, assign) CMTime previousFrameTime;
 @property (nonatomic, assign) CMTime processingFrameTime;
@@ -67,6 +71,22 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     return self;
 }
 
+- (dispatch_queue_t)audio_queue
+{
+    if (!_audio_queue)
+    {
+        _audio_queue = dispatch_queue_create("GPUAudioQueue", nil);
+    }
+    
+    return _audio_queue;
+}
+
+//if (audioPlayer == nil){
+//    audioPlayer = [[GPUImageAudioPlayer alloc] init];
+//    [audioPlayer initAudio];
+//    [audioPlayer startPlaying];
+//}
+
 - (void)setURL:(NSURL *)url
 {
     AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
@@ -110,16 +130,29 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     self.assetReader = [AVAssetReader assetReaderWithAsset:asset
                                                      error:&error];
     
-    NSMutableDictionary *outputSettings = [NSMutableDictionary dictionary];
-    [outputSettings setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
+    NSMutableDictionary *videoOutputSettings = [NSMutableDictionary dictionary];
+    [videoOutputSettings setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
     
     self.isFullYUVRange = YES;
     
-    // Maybe set alwaysCopiesSampleData to NO on iOS 5.0 for faster video decoding
-    self.ouputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeVideo][0]
-                                                                 outputSettings:outputSettings];
-    self.ouputTrack.alwaysCopiesSampleData = NO;
-    [self.assetReader addOutput:self.ouputTrack];
+    self.videoOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeVideo][0]
+                                                                       outputSettings:videoOutputSettings];
+    self.videoOutputTrack.alwaysCopiesSampleData = NO; //Set to NO for faster video decoding.
+    [self.assetReader addOutput:self.videoOutputTrack];
+    
+    NSDictionary *audioOutputSettings = [NSDictionary dictionaryWithObjectsAndKeys:
+                                         [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
+                                         [NSNumber numberWithFloat:44100.0], AVSampleRateKey,
+                                         [NSNumber numberWithInt:16], AVLinearPCMBitDepthKey,
+                                         [NSNumber numberWithBool:NO], AVLinearPCMIsNonInterleaved,
+                                         [NSNumber numberWithBool:NO], AVLinearPCMIsFloatKey,
+                                         [NSNumber numberWithBool:NO], AVLinearPCMIsBigEndianKey,
+                                         nil];
+    
+    self.audioOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeAudio][0]
+                                                                       outputSettings:audioOutputSettings];
+    
+    [self.assetReader addOutput:self.audioOutputTrack];
 }
 
 - (void)loadAsset
@@ -212,6 +245,28 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     }
 }
 
+- (void)readNextAudioSampleFromOutput:(AVAssetReaderTrackOutput *)readerAudioTrackOutput
+{
+    if (false)
+    {
+        return;
+    }
+    
+    CMSampleBufferRef audioSampleBufferRef = [readerAudioTrackOutput copyNextSampleBuffer];
+    if (audioSampleBufferRef)
+    {
+        CFRetain(audioSampleBufferRef);
+        dispatch_async(self.audio_queue, ^
+                       {
+                           //[audioPlayer copyBuffer:audioSampleBufferRef];
+                           
+                           CMSampleBufferInvalidate(audioSampleBufferRef);
+                           CFRelease(audioSampleBufferRef);
+                       });
+        CFRelease(audioSampleBufferRef);
+    }
+}
+
 - (void)yuvConversionSetup;
 {
     if ([GPUImageContext supportsFastTextureUpload])
@@ -263,7 +318,8 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     switch (self.assetReader.status)
     {
         case AVAssetReaderStatusReading:
-            [self readNextVideoFrameFromOutput:self.ouputTrack];
+            [self readNextVideoFrameFromOutput:self.videoOutputTrack];
+            [self readNextAudioSampleFromOutput:self.audioOutputTrack];
             break;
             
         case AVAssetReaderStatusCompleted:
