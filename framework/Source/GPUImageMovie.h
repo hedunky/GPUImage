@@ -14,8 +14,6 @@
  */
 @interface GPUImageMovie : GPUImageOutput
 
-@property (readwrite, retain, nonatomic) AVPlayerItem *playerItem;
-
 /** This enables the benchmarking mode, which logs out instantaneous and average frame times to the console
  */
 @property(readwrite, nonatomic, nonatomic) BOOL runBenchmark;
@@ -46,20 +44,15 @@
 @property (readonly, nonatomic) BOOL videoEncodingIsFinished;
 
 /// @name Initialization and teardown
-- (id)initWithAsset:(AVAsset *)asset;
-- (id)initWithPlayerItem:(AVPlayerItem *)playerItem;
 - (id)initWithURL:(NSURL *)url;
 
 - (void)yuvConversionSetup;
 
 - (void)setURL:(NSURL *)url;
-- (void)setAsset:(AVAsset *)asset;
 
 /// @name Movie processing
-- (void)enableSynchronizedEncodingUsingMovieWriter:(GPUImageMovieWriter *)movieWriter;
 - (void)startProcessing;
 - (void)endProcessing;
 - (void)cancelProcessing;
-- (void)processMovieFrame:(CMSampleBufferRef)movieSampleBuffer;
 
 @end
