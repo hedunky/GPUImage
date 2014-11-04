@@ -57,8 +57,6 @@
 
 /// @name Movie processing
 - (void)enableSynchronizedEncodingUsingMovieWriter:(GPUImageMovieWriter *)movieWriter;
-- (BOOL)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
-- (BOOL)readNextAudioSampleFromOutput:(AVAssetReaderOutput *)readerAudioTrackOutput;
 - (void)startProcessing;
 - (void)endProcessing;
 - (void)cancelProcessing;
