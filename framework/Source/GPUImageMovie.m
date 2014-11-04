@@ -12,7 +12,6 @@
 @property (nonatomic, assign) BOOL videoEncodingIsFinished;
 @property (nonatomic, strong) GPUImageMovieWriter *synchronizedMovieWriter;
 
-@property (nonatomic, strong) AVAssetReader *reader;
 @property (nonatomic, strong) AVPlayerItemVideoOutput *playerItemOutput;
 @property (nonatomic, strong) CADisplayLink *displayLink;
 
@@ -264,20 +263,20 @@
 
 - (float)progress
 {
-    if ( AVAssetReaderStatusReading == self.reader.status )
-    {
-        float current = self.processingFrameTime.value * 1.0f / self.processingFrameTime.timescale;
-        float duration = self.playerItem.asset.duration.value * 1.0f / self.playerItem.asset.duration.timescale;
-        return current / duration;
-    }
-    else if ( AVAssetReaderStatusCompleted == self.reader.status )
-    {
-        return 1.f;
-    }
-    else
-    {
-        return 0.f;
-    }
+//    if ( AVAssetReaderStatusReading == self.reader.status )
+//    {
+//        float current = self.processingFrameTime.value * 1.0f / self.processingFrameTime.timescale;
+//        float duration = self.playerItem.asset.duration.value * 1.0f / self.playerItem.asset.duration.timescale;
+//        return current / duration;
+//    }
+//    else if ( AVAssetReaderStatusCompleted == self.reader.status )
+//    {
+//        return 1.f;
+//    }
+//    else
+//    {
+//        return 0.f;
+//    }
     
     return 0.0f;
 }
@@ -483,9 +482,6 @@
 
 - (void)cancelProcessing
 {
-    if (self.reader) {
-        [self.reader cancelReading];
-    }
     [self endProcessing];
 }
 
@@ -526,10 +522,6 @@
     glVertexAttribPointer(self.yuvConversionTextureCoordinateAttribute, 2, GL_FLOAT, 0, 0, textureCoordinates);
     
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-}
-
-- (AVAssetReader*)assetReader {
-    return self.reader;
 }
 
 - (void)setVolume:(NSUInteger)volume
