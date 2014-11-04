@@ -9,6 +9,8 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
 {
     const GLfloat *preferredConversion;
+    
+    dispatch_semaphore_t frameRenderingSemaphore;
 }
 
 @property (nonatomic, assign) GLfloat preferredRotation;
@@ -19,6 +21,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @property (nonatomic, strong) AVPlayerItem *playerItem;
 @property (nonatomic, strong) AVAssetReader *assetReader;
 @property (nonatomic, strong) CADisplayLink *displayLink;
+//TODO: Move to NSTimer
 
 @property (nonatomic, strong) AVAssetReaderTrackOutput *videoOutputTrack;
 @property (nonatomic, strong) AVAssetReaderTrackOutput *audioOutputTrack;
@@ -69,6 +72,8 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         [self createDisplayLink];
         [self yuvConversionSetup];
         [self setURL: url];
+        
+        frameRenderingSemaphore = dispatch_semaphore_create(1);
     }
     
     return self;
@@ -319,33 +324,44 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
 - (void)displayLinkCallback:(CADisplayLink *)sender
 {
-    switch (self.assetReader.status)
+    if (dispatch_semaphore_wait(frameRenderingSemaphore, DISPATCH_TIME_NOW) != 0)
     {
-        case AVAssetReaderStatusReading:
-            [self readNextVideoFrameFromOutput:self.videoOutputTrack];
-            [self readNextAudioSampleFromOutput:self.audioOutputTrack];
-            break;
-            
-        case AVAssetReaderStatusCompleted:
-            
-            [self.assetReader cancelReading];
-            
-            if (self.shouldRepeat)
-            {
-                self.assetReader = nil;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [self startProcessing];
-                });
-            }
-            else
-            {
-                [self endProcessing];
-            }
-            break;
-            
-        default:
-            break;
+        return;
     }
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+        
+        
+        switch (self.assetReader.status)
+        {
+            case AVAssetReaderStatusReading:
+                [self readNextVideoFrameFromOutput:self.videoOutputTrack];
+                [self readNextAudioSampleFromOutput:self.audioOutputTrack];
+                break;
+                
+            case AVAssetReaderStatusCompleted:
+                
+                [self.assetReader cancelReading];
+                
+                if (self.shouldRepeat)
+                {
+                    self.assetReader = nil;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self startProcessing];
+                    });
+                }
+                else
+                {
+                    [self endProcessing];
+                }
+                break;
+                
+            default:
+                break;
+        }
+        
+        dispatch_semaphore_signal(frameRenderingSemaphore);
+    });
 }
 
 #pragma mark -
