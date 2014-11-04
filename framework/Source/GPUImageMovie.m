@@ -160,12 +160,12 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
                      if ([videoTrack statusOfValueForKey:@"preferredTransform" error:nil] == AVKeyValueStatusLoaded) {
                          
                          
-                         dispatch_async(dispatch_get_main_queue(), ^{
+                        // dispatch_async(dispatch_get_main_queue(), ^{
                              [self.playerItem addOutput:self.playerItemOutput];
                              [self.player replaceCurrentItemWithPlayerItem:self.playerItem];
                              [self.playerItemOutput requestNotificationOfMediaDataChangeWithAdvanceInterval:ONE_FRAME_DURATION];
                              [self.player play];
-                         });
+                        // });
                          
                      }
                      
@@ -295,26 +295,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     
     self.processingFrameTime = currentSampleTime;
     [self processMovieFrame:movieFrame withSampleTime:currentSampleTime];
-}
-
-- (float)progress
-{
-    //    if ( AVAssetReaderStatusReading == self.reader.status )
-    //    {
-    //        float current = self.processingFrameTime.value * 1.0f / self.processingFrameTime.timescale;
-    //        float duration = self.playerItem.asset.duration.value * 1.0f / self.playerItem.asset.duration.timescale;
-    //        return current / duration;
-    //    }
-    //    else if ( AVAssetReaderStatusCompleted == self.reader.status )
-    //    {
-    //        return 1.f;
-    //    }
-    //    else
-    //    {
-    //        return 0.f;
-    //    }
-    
-    return 0.0f;
 }
 
 - (void)processMovieFrame:(CVPixelBufferRef)movieFrame withSampleTime:(CMTime)currentSampleTime
