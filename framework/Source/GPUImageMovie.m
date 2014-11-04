@@ -11,6 +11,8 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     const GLfloat *preferredConversion;
 }
 
+@property (nonatomic, assign) GLfloat preferredRotation;
+
 @property (nonatomic, assign) dispatch_queue_t audio_queue;
 @property (nonatomic, strong) GPUImageAudioPlayer *audioPlayer;
 
@@ -173,6 +175,13 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
          NSError *error = nil;
          AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
          
+         CGAffineTransform preferredTransform = [inputAsset preferredTransform];
+         
+         /*
+          The orientation of the camera while recording affects the orientation of the images received from an AVPlayerItemVideoOutput. Here we compute a rotation that is used to correctly orientate the video.
+          */
+         self.preferredRotation = -1 * atan2(preferredTransform.b, preferredTransform.a);
+         
          if (tracksStatus != AVKeyValueStatusLoaded)
          {
              return;
@@ -185,15 +194,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
 - (void)processAsset
 {
-    AVAssetReaderOutput *readerVideoTrackOutput = nil;
-    
-    for( AVAssetReaderOutput *output in self.assetReader.outputs )
-    {
-        if( [output.mediaType isEqualToString:AVMediaTypeVideo] )
-        {
-            readerVideoTrackOutput = output;
-        }
-    }
     
     if ([self.assetReader startReading] == NO)
     {
