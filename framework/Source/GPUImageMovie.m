@@ -3,8 +3,6 @@
 #import "GPUImageFilter.h"
 #import "GPUImageVideoCamera.h"
 
-# define ONE_FRAME_DURATION 0.03
-
 static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
@@ -17,11 +15,11 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @property (nonatomic, strong) AVPlayerItem *playerItem;
 @property (nonatomic, strong) AVAssetReader *assetReader;
 @property (nonatomic, strong) AVAssetReaderTrackOutput *ouputTrack;
+@property (nonatomic, strong) CADisplayLink *displayLink;
 
 @property (nonatomic, assign) CMTime previousFrameTime;
 @property (nonatomic, assign) CMTime processingFrameTime;
 @property (nonatomic, assign) CFAbsoluteTime previousActualFrameTime;
-@property (nonatomic, assign) BOOL keepLooping;
 
 @property (nonatomic, assign) GLuint luminanceTexture;
 @property (nonatomic, assign) GLuint chrominanceTexture;
@@ -40,8 +38,15 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @property (nonatomic, assign) CFAbsoluteTime startActualFrameTime;
 @property (nonatomic, assign) CGFloat currentVideoTime;
 
+- (void)createDisplayLink;
 - (void)prepareForPlayback;
 - (void)createAssetReader;
+- (void)loadAsset;
+- (void)processAsset;
+
+- (void)play;
+
+- (void)displayLinkCallback:(CADisplayLink *)sender;
 
 @end
 
@@ -56,6 +61,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     
     if (self)
     {
+        [self createDisplayLink];
         [self yuvConversionSetup];
         [self setURL: url];
     }
@@ -80,74 +86,23 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     if (playerItem)
     {
         runAsynchronouslyOnVideoProcessingQueue(^{
-            [self prepareForPlayback];
-            
-            if (self.shouldRepeat) self.keepLooping = YES;
-            
-            self.previousFrameTime = kCMTimeZero;
-            self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
-            
-            NSDictionary *inputOptions = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:AVURLAssetPreferPreciseDurationAndTimingKey];
-            AVAsset *inputAsset = self.playerItem.asset;
-            
-            GPUImageMovie __block *blockSelf = self;
-            
-            [inputAsset loadValuesAsynchronouslyForKeys:[NSArray arrayWithObject:@"tracks"] completionHandler: ^{
-                NSError *error = nil;
-                AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
-                if (tracksStatus != AVKeyValueStatusLoaded)
-                {
-                    return;
-                }
-                [blockSelf prepareForPlayback];
-                blockSelf = nil;
-            }];
+            [self play];
         });
     }
 }
 
+- (void)createDisplayLink
+{
+    self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
+    [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+    self.displayLink.paused = YES;
+    self.displayLink.frameInterval = 1;
+}
 
 - (void)prepareForPlayback
 {
     [self createAssetReader];
-    
-    AVAssetReaderOutput *readerVideoTrackOutput = nil;
-    
-    for( AVAssetReaderOutput *output in self.assetReader.outputs )
-    {
-        if( [output.mediaType isEqualToString:AVMediaTypeVideo] )
-        {
-            readerVideoTrackOutput = output;
-        }
-    }
-    
-    if ([self.assetReader startReading] == NO)
-    {
-        NSLog(@"Error reading from file at URL: %@", @":(");
-        return;
-    }
-    
-    __unsafe_unretained GPUImageMovie *weakSelf = self;
-    
-    while (self.assetReader.status == AVAssetReaderStatusReading && (!self.shouldRepeat || self.keepLooping))
-    {
-        [weakSelf readNextVideoFrameFromOutput:self.ouputTrack];
-    }
-    
-    if (self.assetReader.status == AVAssetReaderStatusCompleted) {
-        
-        [self.assetReader cancelReading];
-        
-        if (self.keepLooping) {
-            self.assetReader = nil;
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self startProcessing];
-            });
-        } else {
-            [weakSelf endProcessing];
-        }
-        
-    }
+    [self loadAsset];
 }
 
 - (void)createAssetReader
@@ -169,6 +124,60 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     [self.assetReader addOutput:self.ouputTrack];
 }
 
+- (void)loadAsset
+{
+    self.previousFrameTime = kCMTimeZero;
+    self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
+    
+    AVAsset *inputAsset = self.playerItem.asset;
+    GPUImageMovie __block *blockSelf = self;
+    
+    [inputAsset loadValuesAsynchronouslyForKeys:[NSArray arrayWithObject:@"tracks"] completionHandler: ^
+     {
+         NSError *error = nil;
+         AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
+         
+         if (tracksStatus != AVKeyValueStatusLoaded)
+         {
+             return;
+         }
+         
+         [blockSelf processAsset];
+         blockSelf = nil;
+     }];
+}
+
+- (void)processAsset
+{
+    AVAssetReaderOutput *readerVideoTrackOutput = nil;
+    
+    for( AVAssetReaderOutput *output in self.assetReader.outputs )
+    {
+        if( [output.mediaType isEqualToString:AVMediaTypeVideo] )
+        {
+            readerVideoTrackOutput = output;
+        }
+    }
+    
+    if ([self.assetReader startReading] == NO)
+    {
+        NSLog(@"Error reading from file at URL: %@", @":(");
+        return;
+    }
+    
+    NSLog(@"Start Linking boss");
+    self.displayLink.paused = NO;
+}
+
+- (void)play
+{
+    self.displayLink.paused = YES;
+    [self.assetReader cancelReading];
+    self.assetReader = nil;
+    
+    [self prepareForPlayback];
+}
+
 - (BOOL)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
 {
     if (self.assetReader.status == AVAssetReaderStatusReading &&
@@ -177,7 +186,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
         if (sampleBufferRef)
         {
-            //NSLog(@"read a video frame: %@", CFBridgingRelease(CMTimeCopyDescription(kCFAllocatorDefault, CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef))));
             if (_playAtActualSpeed)
             {
                 // Do this outside of the video processing queue to not slow that down while waiting
@@ -208,7 +216,8 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         }
         else
         {
-            if (!self.keepLooping) {
+            if (!self.shouldRepeat)
+            {
                 self.videoEncodingIsFinished = YES;
                 if( self.videoEncodingIsFinished && self.audioEncodingIsFinished )
                     [self endProcessing];
@@ -263,19 +272,45 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     }
 }
 
+#pragma mark - CADisplayLink Callback
+
+- (void)displayLinkCallback:(CADisplayLink *)sender
+{
+    
+    switch (self.assetReader.status)
+    {
+        case AVAssetReaderStatusReading:
+            [self readNextVideoFrameFromOutput:self.ouputTrack];
+            break;
+            
+        case AVAssetReaderStatusCompleted:
+            
+            [self.assetReader cancelReading];
+            
+            if (self.shouldRepeat)
+            {
+                self.assetReader = nil;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self startProcessing];
+                });
+            }
+            else
+            {
+                [self endProcessing];
+            }
+            break;
+            
+        default:
+            break;
+    }
+}
+
 #pragma mark -
 #pragma mark Movie processing
 
 - (void)startProcessing
 {
-    [self endProcessing];
-    
-    if (self.shouldRepeat) self.keepLooping = YES;
-    
-    self.previousFrameTime = kCMTimeZero;
-    self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
-    
-    
+    [self play];
 }
 
 - (void)processMovieFrame:(CMSampleBufferRef)movieSampleBuffer;
@@ -401,8 +436,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
 - (void)endProcessing;
 {
-    self.keepLooping = NO;
-    
     for (id<GPUImageInput> currentTarget in targets)
     {
         [currentTarget endProcessing];
