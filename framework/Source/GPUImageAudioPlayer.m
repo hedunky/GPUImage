@@ -12,7 +12,7 @@
 #define SAMPLE_RATE 44100.0
 
 
-#define kUnitSize sizeof(UInt32)
+#define kUnitSize sizeof(AudioSampleType)
 #define kBufferUnit 655360
 #define kTotalBufferSize kBufferUnit * kUnitSize
 #define kRescueBufferSize kBufferUnit / 2
@@ -208,7 +208,6 @@ static OSStatus playbackCallback(void *inRefCon,
         audioFormat.mBytesPerFrame = asbd->mBytesPerFrame;
         audioFormat.mChannelsPerFrame = asbd->mChannelsPerFrame;
         audioFormat.mBitsPerChannel = asbd->mBitsPerChannel;
-        audioFormat.mSampleRate = asbd->mSampleRate;
         
         NSLog(@"[AudioStreamBasicDescription] updating graph uppon first buffer");
         AudioUnitSetProperty(mixerUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, kOutputBus, &audioFormat, oSize);
