@@ -10,13 +10,13 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
 {
     const GLfloat *preferredConversion;
-    AVPlayer *_player;
 }
 
+@property (nonatomic, assign) BOOL videoEncodingIsFinished;
+
 @property (nonatomic, strong) AVPlayerItem *playerItem;
-@property (nonatomic, strong) AVPlayer *player;
-@property (nonatomic, strong) AVPlayerItemVideoOutput *playerItemOutput;
-@property (nonatomic, strong) CADisplayLink *displayLink;
+@property (nonatomic, strong) AVAssetReader *assetReader;
+@property (nonatomic, strong) AVAssetReaderTrackOutput *ouputTrack;
 
 @property (nonatomic, assign) CMTime previousFrameTime;
 @property (nonatomic, assign) CMTime processingFrameTime;
@@ -41,6 +41,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 @property (nonatomic, assign) CGFloat currentVideoTime;
 
 - (void)prepareForPlayback;
+- (void)createAssetReader;
 
 @end
 
@@ -49,20 +50,9 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 #pragma mark -
 #pragma mark Initialization and teardown
 
-- (instancetype)init
-{
-    self = [super init];
-    if (self)
-    {
-        
-    }
-    
-    return self;
-}
-
 - (id)initWithURL:(NSURL *)url;
 {
-    self = [self init];
+    self = [super init];
     
     if (self)
     {
@@ -71,49 +61,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     }
     
     return self;
-}
-
-- (AVPlayer *)player
-{
-    if (!_player)
-    {
-        _player = [[AVPlayer alloc] init];
-        [_player addObserver:self
-                  forKeyPath:@"currentItem.status"
-                     options:NSKeyValueObservingOptionNew
-                     context:AVPlayerItemStatusContext];
-        
-    }
-    
-    return _player;
-}
-
-- (AVPlayerItemOutput *)playerItemOutput
-{
-    if (!_playerItemOutput)
-    {
-        // Setup AVPlayerItemVideoOutput with the required pixelbuffer attributes.
-        NSDictionary *pixBuffAttributes = @{(id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)};
-        _playerItemOutput = [[AVPlayerItemVideoOutput alloc] initWithPixelBufferAttributes:pixBuffAttributes];
-        
-        dispatch_queue_t videoProcessingQueue = [GPUImageContext sharedContextQueue];
-        [_playerItemOutput setDelegate:self queue:videoProcessingQueue];
-    }
-    
-    return _playerItemOutput;
-}
-
-- (CADisplayLink *)displayLink
-{
-    if (!_displayLink)
-    {
-        // Setup CADisplayLink which will callback displayPixelBuffer: at every vsync.
-        _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
-        [_displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
-        // [_displayLink setPaused:YES];
-    }
-    
-    return _displayLink;
 }
 
 - (void)setURL:(NSURL *)url
@@ -132,68 +79,144 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     
     if (playerItem)
     {
-        [self prepareForPlayback];
+        runAsynchronouslyOnVideoProcessingQueue(^{
+            [self prepareForPlayback];
+            
+            if (self.shouldRepeat) self.keepLooping = YES;
+            
+            self.previousFrameTime = kCMTimeZero;
+            self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
+            
+            NSDictionary *inputOptions = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:AVURLAssetPreferPreciseDurationAndTimingKey];
+            AVAsset *inputAsset = self.playerItem.asset;
+            
+            GPUImageMovie __block *blockSelf = self;
+            
+            [inputAsset loadValuesAsynchronouslyForKeys:[NSArray arrayWithObject:@"tracks"] completionHandler: ^{
+                NSError *error = nil;
+                AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
+                if (tracksStatus != AVKeyValueStatusLoaded)
+                {
+                    return;
+                }
+                [blockSelf prepareForPlayback];
+                blockSelf = nil;
+            }];
+        });
     }
 }
 
 
-
 - (void)prepareForPlayback
 {
-    [self.player pause];
-    [self.displayLink setPaused:YES];
+    [self createAssetReader];
     
-    // Remove video output from old item, if any.
-    [self.playerItem removeOutput:self.playerItemOutput];
-    AVAsset *asset = self.playerItem.asset;
+    AVAssetReaderOutput *readerVideoTrackOutput = nil;
     
-    [asset loadValuesAsynchronouslyForKeys:@[@"tracks"] completionHandler:^
-     {
-         
-         if ([asset statusOfValueForKey:@"tracks" error:nil] == AVKeyValueStatusLoaded) {
-             NSArray *tracks = [asset tracksWithMediaType:AVMediaTypeVideo];
-             if ([tracks count] > 0) {
-                 // Choose the first video track.
-                 AVAssetTrack *videoTrack = [tracks objectAtIndex:0];
-                 [videoTrack loadValuesAsynchronouslyForKeys:@[@"preferredTransform"] completionHandler:^{
-                     
-                     if ([videoTrack statusOfValueForKey:@"preferredTransform" error:nil] == AVKeyValueStatusLoaded) {
-                         
-                         
-                        // dispatch_async(dispatch_get_main_queue(), ^{
-                             [self.playerItem addOutput:self.playerItemOutput];
-                             [self.player replaceCurrentItemWithPlayerItem:self.playerItem];
-                             [self.playerItemOutput requestNotificationOfMediaDataChangeWithAdvanceInterval:ONE_FRAME_DURATION];
-                             [self.player play];
-                        // });
-                         
-                     }
-                     
-                 }];
-             }
-         }
-         
-     }];
+    for( AVAssetReaderOutput *output in self.assetReader.outputs )
+    {
+        if( [output.mediaType isEqualToString:AVMediaTypeVideo] )
+        {
+            readerVideoTrackOutput = output;
+        }
+    }
+    
+    if ([self.assetReader startReading] == NO)
+    {
+        NSLog(@"Error reading from file at URL: %@", @":(");
+        return;
+    }
+    
+    __unsafe_unretained GPUImageMovie *weakSelf = self;
+    
+    while (self.assetReader.status == AVAssetReaderStatusReading && (!self.shouldRepeat || self.keepLooping))
+    {
+        [weakSelf readNextVideoFrameFromOutput:self.ouputTrack];
+    }
+    
+    if (self.assetReader.status == AVAssetReaderStatusCompleted) {
+        
+        [self.assetReader cancelReading];
+        
+        if (self.keepLooping) {
+            self.assetReader = nil;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self startProcessing];
+            });
+        } else {
+            [weakSelf endProcessing];
+        }
+        
+    }
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+- (void)createAssetReader
 {
-    //    if (context == AVPlayerItemStatusContext) {
-    //        AVPlayerStatus status = [change[NSKeyValueChangeNewKey] integerValue];
-    //        switch (status) {
-    //            case AVPlayerItemStatusUnknown:
-    //                break;
-    //            case AVPlayerItemStatusReadyToPlay:
-    //                self.playerView.presentationRect = [[_player currentItem] presentationSize];
-    //                break;
-    //            case AVPlayerItemStatusFailed:
-    //                [self stopLoadingAnimationAndHandleError:[[_player currentItem] error]];
-    //                break;
-    //        }
-    //    }
-    //    else {
-    //        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
-    //    }
+    AVAsset *asset = self.playerItem.asset;
+    NSError *error = nil;
+    self.assetReader = [AVAssetReader assetReaderWithAsset:asset
+                                                     error:&error];
+    
+    NSMutableDictionary *outputSettings = [NSMutableDictionary dictionary];
+    [outputSettings setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
+    
+    self.isFullYUVRange = YES;
+    
+    // Maybe set alwaysCopiesSampleData to NO on iOS 5.0 for faster video decoding
+    self.ouputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeVideo][0]
+                                                                 outputSettings:outputSettings];
+    self.ouputTrack.alwaysCopiesSampleData = NO;
+    [self.assetReader addOutput:self.ouputTrack];
+}
+
+- (BOOL)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
+{
+    if (self.assetReader.status == AVAssetReaderStatusReading &&
+        !self.videoEncodingIsFinished)
+    {
+        CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
+        if (sampleBufferRef)
+        {
+            //NSLog(@"read a video frame: %@", CFBridgingRelease(CMTimeCopyDescription(kCFAllocatorDefault, CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef))));
+            if (_playAtActualSpeed)
+            {
+                // Do this outside of the video processing queue to not slow that down while waiting
+                CMTime currentSampleTime = CMSampleBufferGetOutputPresentationTimeStamp(sampleBufferRef);
+                CMTime differenceFromLastFrame = CMTimeSubtract(currentSampleTime, self.previousFrameTime);
+                CFAbsoluteTime currentActualTime = CFAbsoluteTimeGetCurrent();
+                
+                CGFloat frameTimeDifference = CMTimeGetSeconds(differenceFromLastFrame);
+                CGFloat actualTimeDifference = currentActualTime - self.previousActualFrameTime;
+                
+                if (frameTimeDifference > actualTimeDifference)
+                {
+                    usleep(1000000.0 * (frameTimeDifference - actualTimeDifference));
+                }
+                
+                self.previousFrameTime = currentSampleTime;
+                self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
+            }
+            
+            __unsafe_unretained GPUImageMovie *weakSelf = self;
+            runSynchronouslyOnVideoProcessingQueue(^{
+                [weakSelf processMovieFrame:sampleBufferRef];
+                CMSampleBufferInvalidate(sampleBufferRef);
+                CFRelease(sampleBufferRef);
+            });
+            
+            return YES;
+        }
+        else
+        {
+            if (!self.keepLooping) {
+                self.videoEncodingIsFinished = YES;
+                if( self.videoEncodingIsFinished && self.audioEncodingIsFinished )
+                    [self endProcessing];
+            }
+        }
+    }
+    
+    return NO;
 }
 
 - (void)yuvConversionSetup;
@@ -253,36 +276,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
     
     
-}
-
-- (void)outputMediaDataWillChange:(AVPlayerItemOutput *)sender
-{
-    // Restart display link.
-    [self.displayLink setPaused:NO];
-}
-
-- (void)displayLinkCallback:(CADisplayLink *)sender
-{
-    /*
-     The callback gets called once every Vsync.
-     Using the display link's timestamp and duration we can compute the next time the screen will be refreshed, and copy the pixel buffer for that time
-     This pixel buffer can then be processed and later rendered on screen.
-     */
-    // Calculate the nextVsync time which is when the screen will be refreshed next.
-    CFTimeInterval nextVSync = ([sender timestamp] + [sender duration]);
-    
-    CMTime outputItemTime = [self.playerItemOutput itemTimeForHostTime:nextVSync];
-    
-    if ([self.playerItemOutput hasNewPixelBufferForItemTime:outputItemTime])
-    {
-        __unsafe_unretained GPUImageMovie *weakSelf = self;
-        CVPixelBufferRef pixelBuffer = [self.playerItemOutput copyPixelBufferForItemTime:outputItemTime itemTimeForDisplay:NULL];
-        if( pixelBuffer )
-            runSynchronouslyOnVideoProcessingQueue(^{
-                [weakSelf processMovieFrame:pixelBuffer withSampleTime:outputItemTime];
-                CFRelease(pixelBuffer);
-            });
-    }
 }
 
 - (void)processMovieFrame:(CMSampleBufferRef)movieSampleBuffer;
@@ -380,10 +373,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         
-        //            if (!allTargetsWantMonochromeData)
-        //            {
         [self convertYUVToRGBOutput];
-        //            }
         
         for (id<GPUImageInput> currentTarget in targets)
         {
@@ -412,18 +402,11 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 - (void)endProcessing;
 {
     self.keepLooping = NO;
-    //  [self.displayLink setPaused:YES];
     
     for (id<GPUImageInput> currentTarget in targets)
     {
         [currentTarget endProcessing];
     }
-    
-    //    if (self.playerItem && (self.displayLink != nil))
-    //    {
-    //        [self.displayLink invalidate]; // remove from all run loops
-    //        self.displayLink = nil;
-    //    }
     
     if ([self.delegate respondsToSelector:@selector(didCompletePlayingMovie)]) {
         [self.delegate didCompletePlayingMovie];
@@ -478,18 +461,6 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 - (void)setVolume:(NSUInteger)volume
 {
     _volume = volume;
-    if (self.player)
-    {
-        self.player.volume = volume;
-    }
-}
-
-- (void)dealloc
-{
-    [self.player removeObserver:self
-                     forKeyPath:@"currentItem.status"
-                        context:AVPlayerItemStatusContext];
-    
 }
 
 @end
