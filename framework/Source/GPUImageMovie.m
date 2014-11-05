@@ -240,13 +240,19 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
              self.preferredOrientation =  RotationModeFromOrientation(UIImageOrientationDown);
          }
          
-         [blockSelf processAsset];
-         blockSelf = nil;
+         dispatch_async(dispatch_get_main_queue(),
+                        ^{
+                            [blockSelf processAsset];
+                        });
      }];
 }
 
 - (void)processAsset
 {
+    if (self.assetReader.status == AVAssetReaderStatusReading)
+    {
+        return;
+    }
     
     if ([self.assetReader startReading] == NO)
     {
