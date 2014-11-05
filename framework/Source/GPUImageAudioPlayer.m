@@ -92,14 +92,15 @@ static OSStatus playbackCallback(void *inRefCon,
 
 - (id)init{
     self = [super init];
-    if (self){
+    
+    if (self)
+    {
         firstBufferReached = NO;
         rescueBuffer = nil;
         rescueBufferSize = 0;
         _readyForMoreBytes = YES;
+        [self initAudio];
     }
-    
-    [self initAudio];
     
     return self;
 }
@@ -224,7 +225,8 @@ static OSStatus playbackCallback(void *inRefCon,
 - (void)copyBuffer:(CMSampleBufferRef)buf {
     if (!_readyForMoreBytes) return;
     
-    if (!firstBufferReached){
+    if (!firstBufferReached)
+    {
         firstBufferReached = YES;
         CMFormatDescriptionRef formatDescription = CMSampleBufferGetFormatDescription(buf);
         const AudioStreamBasicDescription* const asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription);
@@ -275,7 +277,8 @@ static OSStatus playbackCallback(void *inRefCon,
     }
 }
 
-- (TPCircularBuffer *)getBuffer {
+- (TPCircularBuffer *)getBuffer
+{
     return &circularBuffer;
 }
 
