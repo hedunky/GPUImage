@@ -99,6 +99,8 @@ static OSStatus playbackCallback(void *inRefCon,
         _readyForMoreBytes = YES;
     }
     
+    [self initAudio];
+    
     return self;
 }
 

@@ -264,11 +264,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     [self.audioPlayer startPlaying];
 }
 
-- (void)videoFinish
-{
-    
-}
-
 - (void)play
 {
     [self stop];
