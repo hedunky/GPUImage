@@ -75,6 +75,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 - (void)processAsset;
 
 - (void)play;
+- (void)stop;
 
 - (void)displayLinkCallback:(CADisplayLink *)sender;
 
@@ -271,11 +272,15 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)play
 {
+    [self stop];
+    [self prepareForPlayback];
+}
+
+- (void)stop
+{
     self.displayLink.paused = YES;
     [self.assetReader cancelReading];
     self.assetReader = nil;
-    
-    [self prepareForPlayback];
 }
 
 - (void)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput
@@ -536,6 +541,8 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)endProcessing;
 {
+    [self stop];
+    
     for (id<GPUImageInput> currentTarget in targets)
     {
         [currentTarget endProcessing];
@@ -545,6 +552,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     {
         [self.delegate didCompletePlayingMovie];
     }
+    
     self.delegate = nil;
 }
 
@@ -590,6 +598,11 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     glVertexAttribPointer(self.yuvConversionTextureCoordinateAttribute, 2, GL_FLOAT, 0, 0, textureCoordinates);
     
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+- (void)dealloc
+{
+    [self endProcessing];
 }
 
 @end
