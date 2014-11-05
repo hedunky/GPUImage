@@ -6,30 +6,26 @@
 
 static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
-static inline CGFloat RadiansToDegrees(CGFloat radians)
+GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 {
-    return radians * 180 / M_PI;
-};
-
-GPUImageRotationMode rotationModeFromAngle(CGFloat angle)
-{
-    GPUImageRotationMode orientation = kGPUImageNoRotation;
-    switch ((int)angle) {
-        case 0:
-            orientation = kGPUImageRotateRight;
+    GPUImageRotationMode mode = kGPUImageNoRotation;
+    switch (orientation)
+    {
+        case UIImageOrientationDown:
+            mode = kGPUImageFlipVertical | kGPUImageFlipHorizonal;
             break;
-        case 90:
-            orientation = kGPUImageRotateRightFlipHorizontal;
+        case UIImageOrientationLeft:
+            mode = kGPUImageRotateLeft;
             break;
-        case 180:
-            orientation = kGPUImageRotateLeft;
+        case UIImageOrientationRight:
+            mode = kGPUImageRotateRight;
             break;
-        case -90:
-            orientation	= kGPUImageRotate180;
+            
+        default:
             break;
     }
     
-    return orientation;
+    return mode;
 }
 
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
@@ -204,23 +200,37 @@ GPUImageRotationMode rotationModeFromAngle(CGFloat angle)
     AVAsset *inputAsset = self.playerItem.asset;
     GPUImageMovie __block *blockSelf = self;
     
-    [inputAsset loadValuesAsynchronouslyForKeys:[NSArray arrayWithObject:@"tracks"] completionHandler: ^
+    [inputAsset loadValuesAsynchronouslyForKeys:@[@"tracks", @"preferredTransform"] completionHandler: ^
      {
          NSError *error = nil;
          AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
+         AVKeyValueStatus transformStatus = [inputAsset statusOfValueForKey:@"preferredTransform" error:&error];
          
+         
+         if (tracksStatus != AVKeyValueStatusLoaded &&
+             transformStatus != AVKeyValueStatusLoaded)
+         {
+             return;
+         }
          
          /*
           The orientation of the camera while recording affects the orientation of the images received from an AVPlayerItemVideoOutput. Here we compute a rotation that is used to correctly orientate the video.
           */
-         CGAffineTransform preferredTransform = [inputAsset preferredTransform];
-         CGFloat videoAngleInDegree = RadiansToDegrees(atan2(preferredTransform.b,
-                                                             preferredTransform.a));
-         self.preferredOrientation = rotationModeFromAngle(videoAngleInDegree);
          
-         if (tracksStatus != AVKeyValueStatusLoaded)
-         {
-             return;
+         AVAssetTrack* videoTrack = [[inputAsset tracksWithMediaType:AVMediaTypeVideo] objectAtIndex:0];
+         CGAffineTransform preferredTransform = [videoTrack preferredTransform];
+         
+         if (preferredTransform.a == 0 && preferredTransform.b == 1.0 && preferredTransform.c == -1.0 && preferredTransform.d == 0) {
+             self.preferredOrientation = RotationModeFromOrientation(UIImageOrientationRight);
+         }
+         if (preferredTransform.a == 0 && preferredTransform.b == -1.0 && preferredTransform.c == 1.0 && preferredTransform.d == 0) {
+             self.preferredOrientation = RotationModeFromOrientation(UIImageOrientationLeft);
+         }
+         if (preferredTransform.a == 1.0 && preferredTransform.b == 0 && preferredTransform.c == 0 && preferredTransform.d == 1.0) {
+             self.preferredOrientation =  RotationModeFromOrientation(UIImageOrientationUp);
+         }
+         if (preferredTransform.a == -1.0 && preferredTransform.b == 0 && preferredTransform.c == 0 && preferredTransform.d == -1.0) {
+             self.preferredOrientation =  RotationModeFromOrientation(UIImageOrientationDown);
          }
          
          [blockSelf processAsset];
