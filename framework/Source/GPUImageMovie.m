@@ -6,6 +6,32 @@
 
 static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 
+static inline CGFloat RadiansToDegrees(CGFloat radians)
+{
+    return radians * 180 / M_PI;
+};
+
+GPUImageRotationMode rotationModeFromAngle(CGFloat angle)
+{
+    GPUImageRotationMode orientation = kGPUImageNoRotation;
+    switch ((int)angle) {
+        case 0:
+            orientation = kGPUImageRotateRight;
+            break;
+        case 90:
+            orientation = kGPUImageRotateRightFlipHorizontal;
+            break;
+        case 180:
+            orientation = kGPUImageRotateLeft;
+            break;
+        case -90:
+            orientation	= kGPUImageRotate180;
+            break;
+    }
+    
+    return orientation;
+}
+
 @interface GPUImageMovie () <AVPlayerItemOutputPullDelegate>
 {
     const GLfloat *preferredConversion;
@@ -13,7 +39,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     dispatch_semaphore_t frameRenderingSemaphore;
 }
 
-@property (nonatomic, assign) GLfloat preferredRotation;
+@property (nonatomic, assign) GPUImageRotationMode preferredOrientation;
 
 @property (nonatomic, assign) dispatch_queue_t audio_queue;
 @property (nonatomic, strong) GPUImageAudioPlayer *audioPlayer;
@@ -55,6 +81,9 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
 - (void)play;
 
 - (void)displayLinkCallback:(CADisplayLink *)sender;
+
+- (void)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
+- (void)readNextAudioSampleFromOutput:(AVAssetReaderTrackOutput *)readerAudioTrackOutput;
 
 @end
 
@@ -180,12 +209,14 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
          NSError *error = nil;
          AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
          
-         CGAffineTransform preferredTransform = [inputAsset preferredTransform];
          
          /*
           The orientation of the camera while recording affects the orientation of the images received from an AVPlayerItemVideoOutput. Here we compute a rotation that is used to correctly orientate the video.
           */
-         self.preferredRotation = -1 * atan2(preferredTransform.b, preferredTransform.a);
+         CGAffineTransform preferredTransform = [inputAsset preferredTransform];
+         CGFloat videoAngleInDegree = RadiansToDegrees(atan2(preferredTransform.b,
+                                                             preferredTransform.a));
+         self.preferredOrientation = rotationModeFromAngle(videoAngleInDegree);
          
          if (tracksStatus != AVKeyValueStatusLoaded)
          {
@@ -224,7 +255,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
     [self prepareForPlayback];
 }
 
-- (void)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput;
+- (void)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput
 {
     CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
     if (sampleBufferRef)
@@ -247,11 +278,12 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
         
         __unsafe_unretained GPUImageMovie *weakSelf = self;
-        runSynchronouslyOnVideoProcessingQueue(^{
-            [weakSelf processMovieFrame:sampleBufferRef];
-            CMSampleBufferInvalidate(sampleBufferRef);
-            CFRelease(sampleBufferRef);
-        });
+        runSynchronouslyOnVideoProcessingQueue(^
+                                               {
+                                                   [weakSelf processMovieFrame:sampleBufferRef];
+                                                   CMSampleBufferInvalidate(sampleBufferRef);
+                                                   CFRelease(sampleBufferRef);
+                                               });
     }
 }
 
@@ -469,6 +501,7 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
             NSInteger indexOfObject = [targets indexOfObject:currentTarget];
             NSInteger targetTextureIndex = [[targetTextureIndices objectAtIndex:indexOfObject] integerValue];
             [currentTarget newFrameReadyAtTime:currentSampleTime atIndex:targetTextureIndex];
+            [currentTarget setInputRotation:self.preferredOrientation  atIndex:targetTextureIndex];
         }
         
         CVPixelBufferUnlockBaseAddress(movieFrame, 0);
@@ -485,7 +518,8 @@ static void *AVPlayerItemStatusContext = &AVPlayerItemStatusContext;
         [currentTarget endProcessing];
     }
     
-    if ([self.delegate respondsToSelector:@selector(didCompletePlayingMovie)]) {
+    if ([self.delegate respondsToSelector:@selector(didCompletePlayingMovie)])
+    {
         [self.delegate didCompletePlayingMovie];
     }
     self.delegate = nil;
