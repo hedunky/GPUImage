@@ -25,5 +25,6 @@
 @property(nonatomic, assign) BOOL hasBuffer;
 @property(nonatomic, assign) SInt32 bufferSize;
 @property(nonatomic, readonly) BOOL readyForMoreBytes;
+@property (nonatomic, assign) NSUInteger volume;
 
 @end

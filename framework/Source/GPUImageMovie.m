@@ -148,6 +148,16 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     }
 }
 
+- (void)setVolume:(NSUInteger)volume
+{
+    self.audioPlayer.volume = volume;
+}
+
+- (NSUInteger)volume
+{
+    return self.audioPlayer.volume;
+}
+
 - (void)createDisplayLink
 {
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
@@ -200,15 +210,12 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     AVAsset *inputAsset = self.playerItem.asset;
     GPUImageMovie __block *blockSelf = self;
     
-    [inputAsset loadValuesAsynchronouslyForKeys:@[@"tracks", @"preferredTransform"] completionHandler: ^
+    [inputAsset loadValuesAsynchronouslyForKeys:@[@"tracks"] completionHandler: ^
      {
          NSError *error = nil;
          AVKeyValueStatus tracksStatus = [inputAsset statusOfValueForKey:@"tracks" error:&error];
-         AVKeyValueStatus transformStatus = [inputAsset statusOfValueForKey:@"preferredTransform" error:&error];
          
-         
-         if (tracksStatus != AVKeyValueStatusLoaded &&
-             transformStatus != AVKeyValueStatusLoaded)
+         if (tracksStatus != AVKeyValueStatusLoaded)
          {
              return;
          }
@@ -577,11 +584,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     glVertexAttribPointer(self.yuvConversionTextureCoordinateAttribute, 2, GL_FLOAT, 0, 0, textureCoordinates);
     
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-}
-
-- (void)setVolume:(NSUInteger)volume
-{
-    _volume = volume;
 }
 
 @end

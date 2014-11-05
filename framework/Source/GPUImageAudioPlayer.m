@@ -97,12 +97,23 @@ static OSStatus playbackCallback(void *inRefCon,
     [self stopPlaying];
 }
 
+- (void)setVolume:(NSUInteger)volume
+{
+    AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, 0, volume, 0 );
+}
+
+- (NSUInteger)volume
+{
+    float volume;
+    AudioUnitGetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, 0, &volume);
+    return volume;
+}
 
 #pragma mark -
 #pragma mark audio player methods
 
-- (void)initAudio {
-    
+- (void)initAudio
+{
     AVAudioSession *session = [AVAudioSession sharedInstance];
     [session setCategory:AVAudioSessionCategoryAmbient error:nil];
     [session setActive:YES error:nil];
