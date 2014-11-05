@@ -161,9 +161,9 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 - (void)createDisplayLink
 {
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
-    [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
     self.displayLink.paused = YES;
     self.displayLink.frameInterval = 1;
+    [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 }
 
 - (void)prepareForPlayback
