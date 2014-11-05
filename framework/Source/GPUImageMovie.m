@@ -121,7 +121,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     {
         _audioPlayer = [[GPUImageAudioPlayer alloc] init];
         [_audioPlayer initAudio];
-        [_audioPlayer startPlaying];
     }
     
     return _audioPlayer;
@@ -261,8 +260,8 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
         return;
     }
     
-    NSLog(@"Start Linking boss");
     self.displayLink.paused = NO;
+    [self.audioPlayer startPlaying];
 }
 
 - (void)videoFinish
@@ -280,6 +279,8 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 {
     self.displayLink.paused = YES;
     [self.assetReader cancelReading];
+    
+    [self.audioPlayer stopPlaying];
     self.assetReader = nil;
 }
 
