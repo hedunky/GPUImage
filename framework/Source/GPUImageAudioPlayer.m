@@ -18,6 +18,21 @@
 #define kTotalBufferSize kBufferUnit * kUnitSize
 #define kRescueBufferSize kBufferUnit / 2
 
+static void CheckStatus(OSStatus status)
+{
+    if(status != noErr)
+    {
+        char fourCC[16];
+        *(UInt32 *)fourCC = CFSwapInt32HostToBig(status);
+        fourCC[4] = '\0';
+        
+        if(isprint(fourCC[0]) && isprint(fourCC[1]) && isprint(fourCC[2]) && isprint(fourCC[3]))
+            NSLog(@"Error: %s", fourCC);
+        else
+            NSLog(@"Error: %ld", status);
+    }
+}
+
 @interface GPUImageAudioPlayer(){
     AUGraph processingGraph;
     AudioUnit mixerUnit;
@@ -99,13 +114,14 @@ static OSStatus playbackCallback(void *inRefCon,
 
 - (void)setVolume:(NSUInteger)volume
 {
-    AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, 0, volume, 0 );
+    CheckStatus(AudioUnitSetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, kOutputBus, volume, 0));
+    AUGraphUpdate(processingGraph, NULL);
 }
 
 - (NSUInteger)volume
 {
     float volume;
-    AudioUnitGetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Input, 0, &volume);
+    AudioUnitGetParameter(mixerUnit, kMultiChannelMixerParam_Volume, kAudioUnitScope_Output, kOutputBus, &volume);
     return volume;
 }
 
@@ -130,7 +146,7 @@ static OSStatus playbackCallback(void *inRefCon,
     // mixer component
     AudioComponentDescription mixer_desc;
     mixer_desc.componentType = kAudioUnitType_Mixer;
-    mixer_desc.componentSubType = kAudioUnitSubType_AU3DMixerEmbedded;
+    mixer_desc.componentSubType = kAudioUnitSubType_MultiChannelMixer;
     mixer_desc.componentFlags = 0;
     mixer_desc.componentFlagsMask = 0;
     mixer_desc.componentManufacturer = kAudioUnitManufacturer_Apple;
