@@ -129,6 +129,8 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 {
     AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
     self.playerItem = item;
+    
+    NSLog(@"MOVIE PLAYER: URL WAS SET TO %@", url);
 }
 
 - (void)setPlayerItem:(AVPlayerItem *)playerItem
@@ -138,13 +140,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     _playerItem = playerItem;
     
     [self didChangeValueForKey:@"playerItem"];
-    
-    if (playerItem)
-    {
-        runAsynchronouslyOnVideoProcessingQueue(^{
-            [self play];
-        });
-    }
 }
 
 - (void)setVolume:(NSUInteger)volume
@@ -250,11 +245,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)processAsset
 {
-    if (self.assetReader.status == AVAssetReaderStatusReading)
-    {
-        return;
-    }
-    
     if ([self.assetReader startReading] == NO)
     {
         NSLog(@"Error reading from file at URL: %@", @":(");
@@ -267,8 +257,17 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)play
 {
+    
+    NSLog(@"Asset reader status before reading was %i", self.assetReader.status);
+    if (self.assetReader.status == AVAssetReaderStatusReading)
+    {
+        return;
+    }
+    
     [self stop];
     [self prepareForPlayback];
+    
+    NSLog(@"Play for me :O");
 }
 
 - (void)stop
