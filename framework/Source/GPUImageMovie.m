@@ -394,30 +394,30 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
         return;
     }
     
+    __weak GPUImageMovie *weakSelf = self;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
         
-        
-        switch (self.assetReader.status)
+        switch (weakSelf.assetReader.status)
         {
             case AVAssetReaderStatusReading:
-                [self readNextVideoFrameFromOutput:self.videoOutputTrack];
-                [self readNextAudioSampleFromOutput:self.audioOutputTrack];
+                [weakSelf readNextVideoFrameFromOutput:weakSelf.videoOutputTrack];
+                [weakSelf readNextAudioSampleFromOutput:weakSelf.audioOutputTrack];
                 break;
                 
             case AVAssetReaderStatusCompleted:
                 
-                [self.assetReader cancelReading];
+                [weakSelf.assetReader cancelReading];
                 
-                if (self.shouldRepeat)
+                if (weakSelf.shouldRepeat)
                 {
-                    self.assetReader = nil;
+                    weakSelf.assetReader = nil;
                     dispatch_async(dispatch_get_main_queue(), ^{
-                        [self startProcessing];
+                        [weakSelf startProcessing];
                     });
                 }
                 else
                 {
-                    [self endProcessing];
+                    [weakSelf endProcessing];
                 }
                 break;
                 
