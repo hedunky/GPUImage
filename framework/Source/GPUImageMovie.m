@@ -175,10 +175,19 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     NSMutableDictionary *videoOutputSettings = [NSMutableDictionary dictionary];
     [videoOutputSettings setObject:@(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) forKey:(id)kCVPixelBufferPixelFormatTypeKey];
     
-    self.videoOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeVideo][0]
-                                                                       outputSettings:videoOutputSettings];
-    self.videoOutputTrack.alwaysCopiesSampleData = NO; //Set to NO for faster video decoding.
-    [self.assetReader addOutput:self.videoOutputTrack];
+    NSArray *videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
+    if (videoTracks.count > 0)
+    {
+        self.videoOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:videoTracks[0]
+                                                                           outputSettings:videoOutputSettings];
+        self.videoOutputTrack.alwaysCopiesSampleData = NO; //Set to NO for faster video decoding.
+        [self.assetReader addOutput:self.videoOutputTrack];
+    }
+    else
+    {
+        [self stop];
+        return;
+    }
     
     NSDictionary *audioOutputSettings = [NSDictionary dictionaryWithObjectsAndKeys:
                                          [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
@@ -189,10 +198,19 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
                                          [NSNumber numberWithBool:NO], AVLinearPCMIsBigEndianKey,
                                          nil];
     
-    self.audioOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:[asset tracksWithMediaType:AVMediaTypeAudio][0]
-                                                                       outputSettings:audioOutputSettings];
     
-    [self.assetReader addOutput:self.audioOutputTrack];
+    NSArray *audioTracks = [asset tracksWithMediaType:AVMediaTypeAudio];
+    if (audioTracks.count > 0)
+    {
+        self.audioOutputTrack = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:audioTracks[0]
+                                                                           outputSettings:audioOutputSettings];
+        
+        [self.assetReader addOutput:self.audioOutputTrack];
+    }
+    else
+    {
+        [self stop];
+    }
 }
 
 - (void)loadAsset
