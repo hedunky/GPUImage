@@ -95,7 +95,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     
     if (self)
     {
-        [self createDisplayLink];
         [self yuvConversionSetup];
         [self setURL: url];
         
@@ -155,7 +154,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 {
     self.displayLink = [CADisplayLink displayLinkWithTarget:self
                                                    selector:@selector(displayLinkCallback:)];
-    self.displayLink.paused = YES;
+    //self.displayLink.paused = YES;
     self.displayLink.frameInterval = 1;
     [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 }
@@ -220,7 +219,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
     
     AVAsset *inputAsset = self.playerItem.asset;
-    GPUImageMovie __block *blockSelf = self;
+    GPUImageMovie __block * blockSelf = self;
     
     [inputAsset loadValuesAsynchronouslyForKeys:@[@"tracks"] completionHandler: ^
      {
@@ -273,7 +272,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
         return;
     }
     
-    self.displayLink.paused = NO;
+    [self createDisplayLink];
     [self.audioPlayer startPlaying];
 }
 
@@ -290,12 +289,19 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)stop
 {
-    self.displayLink.paused = YES;
-    [self.assetReader cancelReading];
+    if (self.assetReader.status != AVAssetReaderStatusReading)
+    {
+        return;
+    }
+    
+    [self.displayLink invalidate];
     [self.audioPlayer stopPlaying];
+    
+    [self.assetReader cancelReading];
     self.assetReader = nil;
 }
 
+//Come up with way to sync Video to Audio.
 - (void)readNextVideoFrameFromOutput:(AVAssetReaderOutput *)readerVideoTrackOutput
 {
     CMSampleBufferRef sampleBufferRef = [readerVideoTrackOutput copyNextSampleBuffer];
