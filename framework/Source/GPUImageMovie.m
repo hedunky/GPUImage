@@ -262,7 +262,8 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)processAsset
 {
-    if (self.assetReader.status == AVAssetReaderStatusReading)
+    if (self.assetReader.status == AVAssetReaderStatusReading ||
+        self.assetReader.outputs.count == 0)
     {
         return;
     }
@@ -291,7 +292,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 {
     self.displayLink.paused = YES;
     [self.assetReader cancelReading];
-    
     [self.audioPlayer stopPlaying];
     self.assetReader = nil;
 }
