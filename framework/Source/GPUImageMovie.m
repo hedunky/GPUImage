@@ -129,8 +129,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 {
     AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
     self.playerItem = item;
-    
-    NSLog(@"MOVIE PLAYER: URL WAS SET TO %@", url);
 }
 
 - (void)setPlayerItem:(AVPlayerItem *)playerItem
@@ -257,8 +255,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)play
 {
-    
-    NSLog(@"Asset reader status before reading was %i", self.assetReader.status);
     if (self.assetReader.status == AVAssetReaderStatusReading)
     {
         return;
@@ -266,8 +262,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     
     [self stop];
     [self prepareForPlayback];
-    
-    NSLog(@"Play for me :O");
 }
 
 - (void)stop
@@ -335,45 +329,42 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)yuvConversionSetup;
 {
-    if ([GPUImageContext supportsFastTextureUpload])
-    {
-        runSynchronouslyOnVideoProcessingQueue(^
+    runSynchronouslyOnVideoProcessingQueue(^
+                                           {
+                                               [GPUImageContext useImageProcessingContext];
+                                               
+                                               preferredConversion = kColorConversion709;
+                                               self.yuvConversionProgram = [[GPUImageContext sharedImageProcessingContext] programForVertexShaderString:kGPUImageVertexShaderString fragmentShaderString:kGPUImageYUVFullRangeConversionForLAFragmentShaderString];
+                                               
+                                               if (!self.yuvConversionProgram.initialized)
                                                {
-                                                   [GPUImageContext useImageProcessingContext];
+                                                   [self.yuvConversionProgram addAttribute:@"position"];
+                                                   [self.yuvConversionProgram addAttribute:@"inputTextureCoordinate"];
                                                    
-                                                   preferredConversion = kColorConversion709;
-                                                   self.yuvConversionProgram = [[GPUImageContext sharedImageProcessingContext] programForVertexShaderString:kGPUImageVertexShaderString fragmentShaderString:kGPUImageYUVFullRangeConversionForLAFragmentShaderString];
-                                                   
-                                                   if (!self.yuvConversionProgram.initialized)
+                                                   if (![self.yuvConversionProgram link])
                                                    {
-                                                       [self.yuvConversionProgram addAttribute:@"position"];
-                                                       [self.yuvConversionProgram addAttribute:@"inputTextureCoordinate"];
-                                                       
-                                                       if (![self.yuvConversionProgram link])
-                                                       {
-                                                           NSString *progLog = [self.yuvConversionProgram programLog];
-                                                           NSLog(@"Program link log: %@", progLog);
-                                                           NSString *fragLog = [self.yuvConversionProgram fragmentShaderLog];
-                                                           NSLog(@"Fragment shader compile log: %@", fragLog);
-                                                           NSString *vertLog = [self.yuvConversionProgram vertexShaderLog];
-                                                           NSLog(@"Vertex shader compile log: %@", vertLog);
-                                                           self.yuvConversionProgram = nil;
-                                                           NSAssert(NO, @"Filter shader link failed");
-                                                       }
+                                                       NSString *progLog = [self.yuvConversionProgram programLog];
+                                                       NSLog(@"Program link log: %@", progLog);
+                                                       NSString *fragLog = [self.yuvConversionProgram fragmentShaderLog];
+                                                       NSLog(@"Fragment shader compile log: %@", fragLog);
+                                                       NSString *vertLog = [self.yuvConversionProgram vertexShaderLog];
+                                                       NSLog(@"Vertex shader compile log: %@", vertLog);
+                                                       self.yuvConversionProgram = nil;
+                                                       NSAssert(NO, @"Filter shader link failed");
                                                    }
-                                                   
-                                                   self.yuvConversionPositionAttribute = [self.yuvConversionProgram attributeIndex:@"position"];
-                                                   self.yuvConversionTextureCoordinateAttribute = [self.yuvConversionProgram attributeIndex:@"inputTextureCoordinate"];
-                                                   self.yuvConversionLuminanceTextureUniform = [self.yuvConversionProgram uniformIndex:@"luminanceTexture"];
-                                                   self.yuvConversionChrominanceTextureUniform = [self.yuvConversionProgram uniformIndex:@"chrominanceTexture"];
-                                                   self.yuvConversionMatrixUniform = [self.yuvConversionProgram uniformIndex:@"colorConversionMatrix"];
-                                                   
-                                                   [GPUImageContext setActiveShaderProgram:self.yuvConversionProgram];
-                                                   
-                                                   glEnableVertexAttribArray(self.yuvConversionPositionAttribute);
-                                                   glEnableVertexAttribArray(self.yuvConversionTextureCoordinateAttribute);
-                                               });
-    }
+                                               }
+                                               
+                                               self.yuvConversionPositionAttribute = [self.yuvConversionProgram attributeIndex:@"position"];
+                                               self.yuvConversionTextureCoordinateAttribute = [self.yuvConversionProgram attributeIndex:@"inputTextureCoordinate"];
+                                               self.yuvConversionLuminanceTextureUniform = [self.yuvConversionProgram uniformIndex:@"luminanceTexture"];
+                                               self.yuvConversionChrominanceTextureUniform = [self.yuvConversionProgram uniformIndex:@"chrominanceTexture"];
+                                               self.yuvConversionMatrixUniform = [self.yuvConversionProgram uniformIndex:@"colorConversionMatrix"];
+                                               
+                                               [GPUImageContext setActiveShaderProgram:self.yuvConversionProgram];
+                                               
+                                               glEnableVertexAttribArray(self.yuvConversionPositionAttribute);
+                                               glEnableVertexAttribArray(self.yuvConversionTextureCoordinateAttribute);
+                                           });
 }
 
 #pragma mark - CADisplayLink Callback
