@@ -219,6 +219,8 @@ static OSStatus playbackCallback(void *inRefCon,
 - (void)stopPlaying {
     // Start playing
     AUGraphStop(processingGraph);
+    TPCircularBufferClear(&circularBuffer);
+    [self readyForMoreBytes];
 }
 
 
