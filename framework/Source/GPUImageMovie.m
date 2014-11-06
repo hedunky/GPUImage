@@ -127,6 +127,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)setURL:(NSURL *)url
 {
+    NSLog(@"Loading %@", url);
     AVPlayerItem *item = [AVPlayerItem playerItemWithURL:url];
     self.playerItem = item;
 }
@@ -261,9 +262,13 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)processAsset
 {
+    if (self.assetReader.status == AVAssetReaderStatusReading)
+    {
+        return;
+    }
+    
     if ([self.assetReader startReading] == NO)
     {
-        NSLog(@"Error reading from file at URL: %@", @":(");
         return;
     }
     
