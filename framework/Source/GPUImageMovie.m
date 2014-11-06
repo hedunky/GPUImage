@@ -40,6 +40,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 @property (nonatomic, assign) dispatch_queue_t audio_queue;
 @property (nonatomic, strong) GPUImageAudioPlayer *audioPlayer;
 
+
 @property (nonatomic, strong) AVPlayerItem *playerItem;
 @property (nonatomic, strong) AVAssetReader *assetReader;
 @property (nonatomic, strong) CADisplayLink *displayLink;
@@ -64,9 +65,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 @property (nonatomic, assign) int imageBufferWidth;
 @property (nonatomic, assign) int imageBufferHeight;
-
-@property (nonatomic, assign) CFAbsoluteTime startActualFrameTime;
-@property (nonatomic, assign) CGFloat currentVideoTime;
 
 - (void)createDisplayLink;
 - (void)prepareForPlayback;
@@ -316,12 +314,11 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
         self.previousActualFrameTime = CFAbsoluteTimeGetCurrent();
         
         __unsafe_unretained GPUImageMovie *weakSelf = self;
-        runSynchronouslyOnVideoProcessingQueue(^
-                                               {
-                                                   [weakSelf processMovieFrame:sampleBufferRef];
-                                                   CMSampleBufferInvalidate(sampleBufferRef);
-                                                   CFRelease(sampleBufferRef);
-                                               });
+        runAsynchronouslyOnVideoProcessingQueue(^{
+            [weakSelf processMovieFrame:sampleBufferRef];
+            CMSampleBufferInvalidate(sampleBufferRef);
+            CFRelease(sampleBufferRef);
+        });
     }
 }
 
