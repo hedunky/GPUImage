@@ -120,7 +120,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     if (!_audioPlayer)
     {
         _audioPlayer = [[GPUImageAudioPlayer alloc] init];
-        [_audioPlayer initAudio];
     }
     
     return _audioPlayer;
@@ -160,7 +159,8 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
 
 - (void)createDisplayLink
 {
-    self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkCallback:)];
+    self.displayLink = [CADisplayLink displayLinkWithTarget:self
+                                                   selector:@selector(displayLinkCallback:)];
     self.displayLink.paused = YES;
     self.displayLink.frameInterval = 1;
     [self.displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
@@ -227,6 +227,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
          AVAssetTrack* videoTrack = [[inputAsset tracksWithMediaType:AVMediaTypeVideo] objectAtIndex:0];
          CGAffineTransform preferredTransform = [videoTrack preferredTransform];
          
+         //TODO: Figure out how this works.
          if (preferredTransform.a == 0 && preferredTransform.b == 1.0 && preferredTransform.c == -1.0 && preferredTransform.d == 0) {
              self.preferredOrientation = RotationModeFromOrientation(UIImageOrientationRight);
          }
