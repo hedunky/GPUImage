@@ -183,11 +183,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
         self.videoOutputTrack.alwaysCopiesSampleData = NO; //Set to NO for faster video decoding.
         [self.assetReader addOutput:self.videoOutputTrack];
     }
-    else
-    {
-        [self stop];
-        return;
-    }
     
     NSDictionary *audioOutputSettings = [NSDictionary dictionaryWithObjectsAndKeys:
                                          [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
@@ -206,10 +201,6 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
                                                                            outputSettings:audioOutputSettings];
         
         [self.assetReader addOutput:self.audioOutputTrack];
-    }
-    else
-    {
-        [self stop];
     }
 }
 
