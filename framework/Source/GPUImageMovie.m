@@ -394,7 +394,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     }
     
     __weak GPUImageMovie *weakSelf = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^() {
         
         switch (weakSelf.assetReader.status)
         {
@@ -574,11 +574,26 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    static const GLfloat squareVertices[] = {
-        -1.0f, -1.0f,
-        1.0f, -1.0f,
-        -1.0f,  1.0f,
-        1.0f,  1.0f,
+    CGFloat screenWidth = self.aspectRatio.width;
+    CGFloat screenHeight = self.aspectRatio.height;
+    
+    CGRect insetRect = AVMakeRectWithAspectRatioInsideRect(CGSizeMake(self.videoSize.width, self.videoSize.height),
+                                                           CGRectMake(0, 0, screenWidth, screenHeight));
+    
+    GLfloat xRatio = insetRect.size.width / screenWidth;
+    GLfloat yRatio = insetRect.size.height / screenHeight;
+    
+    if (screenWidth > screenHeight) {
+        GLfloat temp = xRatio;
+        xRatio = yRatio;
+        yRatio = temp;
+    }
+    
+    const GLfloat squareVertices[] = {
+        -1.0f * xRatio, -1.0f * yRatio,
+        1.0f * xRatio, -1.0f * yRatio,
+        -1.0f * xRatio,  1.0f * yRatio,
+        1.0f * xRatio,  1.0f * yRatio,
     };
     
     static const GLfloat textureCoordinates[] = {

@@ -59,6 +59,9 @@ void reportAvailableMemoryForGPUImage(NSString *tag);
 @property(nonatomic) BOOL enabled;
 @property(readwrite, nonatomic) GPUTextureOptions outputTextureOptions;
 
+@property (readwrite, nonatomic) CGSize aspectRatio;
+@property (readwrite, nonatomic) CGSize videoSize;
+
 /// @name Managing targets
 - (void)setInputFramebufferForTarget:(id<GPUImageInput>)target atIndex:(NSInteger)inputTextureIndex;
 - (GPUImageFramebuffer *)framebufferForOutput;
