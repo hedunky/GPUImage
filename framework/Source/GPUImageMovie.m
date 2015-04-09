@@ -583,7 +583,7 @@ GPUImageRotationMode RotationModeFromOrientation(UIImageOrientation orientation)
     GLfloat xRatio = insetRect.size.width / screenWidth;
     GLfloat yRatio = insetRect.size.height / screenHeight;
     
-    if (screenWidth > screenHeight) {
+    if (screenWidth > screenHeight && self.videoSize.height > self.videoSize.width) {
         GLfloat temp = xRatio;
         xRatio = yRatio;
         yRatio = temp;
