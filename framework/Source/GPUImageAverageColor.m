@@ -1,4 +1,11 @@
 #import "GPUImageAverageColor.h"
+#import <GLKit/GLKit.h>
+
+typedef struct
+{
+    GLKVector3 vector;
+    int count;
+} VectorValue;
 
 NSString *const kGPUImageColorAveragingVertexShaderString = SHADER_STRING
 (
@@ -127,6 +134,7 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
     
     NSUInteger numberOfReductionsInX = floor(log(inputTextureSize.width) / log(4.0));
     NSUInteger numberOfReductionsInY = floor(log(inputTextureSize.height) / log(4.0));
+    numberOfReductionsInX = numberOfReductionsInY = 3;
     NSUInteger reductionsToHitSideLimit = MIN(numberOfReductionsInX, numberOfReductionsInY);
     for (NSUInteger currentReduction = 0; currentReduction < reductionsToHitSideLimit; currentReduction++)
     {
@@ -187,12 +195,68 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
         
         NSUInteger redTotal = 0, greenTotal = 0, blueTotal = 0, alphaTotal = 0;
         NSUInteger byteIndex = 0;
-        for (NSUInteger currentPixel = 0; currentPixel < totalNumberOfPixels; currentPixel++)
+        /*for (NSUInteger currentPixel = 0; currentPixel < totalNumberOfPixels; currentPixel++)
         {
             redTotal += rawImagePixels[byteIndex++];
             greenTotal += rawImagePixels[byteIndex++];
             blueTotal += rawImagePixels[byteIndex++];
             alphaTotal += rawImagePixels[byteIndex++];
+        }*/
+        
+        NSMutableArray *values = [NSMutableArray array];
+        
+        for (NSUInteger currentPixel = 0; currentPixel < totalNumberOfPixels; currentPixel++) {
+            NSUInteger red = rawImagePixels[byteIndex++];
+            NSUInteger green = rawImagePixels[byteIndex++];
+            NSUInteger blue = rawImagePixels[byteIndex++];
+            NSUInteger alpha = rawImagePixels[byteIndex++];
+            
+            GLKVector3 vector = GLKVector3Make(red, green, blue);
+            NSValue *closestValue = nil;
+            float minimalDistance = INTMAX_MAX;
+            int index = 0;
+            for (NSValue *otherVectorValue in values) {
+                VectorValue otherVector;
+                [otherVectorValue getValue:&otherVector];
+                float distance = GLKVector3Distance(vector, otherVector.vector);
+                if (distance < minimalDistance) {
+                    closestValue = otherVectorValue;
+                    minimalDistance = distance;
+                    index = [values indexOfObject:otherVectorValue];
+                }
+            }
+            
+            if (closestValue && minimalDistance < 50) {
+                VectorValue otherVector;
+                [closestValue getValue:&otherVector];
+                otherVector.count++;
+                NSValue *value = [NSValue valueWithBytes:&otherVector objCType:@encode(VectorValue)];
+                [values replaceObjectAtIndex:index withObject:value];
+            } else {
+                VectorValue valueVector = {vector, 0};
+                NSValue *value = [NSValue valueWithBytes:&valueVector objCType:@encode(VectorValue)];
+                [values addObject:value];
+            }
+        }
+        
+        GLKVector3 vector;
+        int maxCount = 0;
+        for (NSValue *value in values) {
+            VectorValue otherVector;
+            [value getValue:&otherVector];
+            
+            if (otherVector.count > maxCount) {
+                vector = otherVector.vector;
+                maxCount = otherVector.count;
+            }
+        }
+        
+        static const int diff = 90;
+        if (fabs(vector.r - vector.g) > diff ||
+            fabs(vector.r - vector.b) > diff ||
+            fabs(vector.g - vector.b) > diff
+            ) {
+            self.colorAverageProcessingFinishedBlock(vector.r /255.f, vector.g / 255.f, vector.b / 255.f, 1.f, frameTime);
         }
         
         CGFloat normalizedRedTotal = (CGFloat)redTotal / (CGFloat)totalNumberOfPixels / 255.0;
@@ -202,7 +266,7 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
         
         if (_colorAverageProcessingFinishedBlock != NULL)
         {
-            _colorAverageProcessingFinishedBlock(normalizedRedTotal, normalizedGreenTotal, normalizedBlueTotal, normalizedAlphaTotal, frameTime);
+            //_colorAverageProcessingFinishedBlock(normalizedRedTotal, normalizedGreenTotal, normalizedBlueTotal, normalizedAlphaTotal, frameTime);
         }
     });
 }
