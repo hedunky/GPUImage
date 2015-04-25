@@ -134,7 +134,7 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
     
     NSUInteger numberOfReductionsInX = floor(log(inputTextureSize.width) / log(4.0));
     NSUInteger numberOfReductionsInY = floor(log(inputTextureSize.height) / log(4.0));
-    numberOfReductionsInX = numberOfReductionsInY = 3;
+    numberOfReductionsInX = numberOfReductionsInY = 2;
     NSUInteger reductionsToHitSideLimit = MIN(numberOfReductionsInX, numberOfReductionsInY);
     for (NSUInteger currentReduction = 0; currentReduction < reductionsToHitSideLimit; currentReduction++)
     {
@@ -192,17 +192,18 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
         [GPUImageContext useImageProcessingContext];
         [outputFramebuffer activateFramebuffer];
         glReadPixels(0, 0, (int)finalStageSize.width, (int)finalStageSize.height, GL_RGBA, GL_UNSIGNED_BYTE, rawImagePixels);
+        self.colorAverageProcessingFinishedBlock(rawImagePixels, totalNumberOfPixels, finalStageSize);
         
-        NSUInteger redTotal = 0, greenTotal = 0, blueTotal = 0, alphaTotal = 0;
+        /*NSUInteger redTotal = 0, greenTotal = 0, blueTotal = 0, alphaTotal = 0;
         NSUInteger byteIndex = 0;
-        /*for (NSUInteger currentPixel = 0; currentPixel < totalNumberOfPixels; currentPixel++)
+        for (NSUInteger currentPixel = 0; currentPixel < totalNumberOfPixels; currentPixel++)
         {
             redTotal += rawImagePixels[byteIndex++];
             greenTotal += rawImagePixels[byteIndex++];
             blueTotal += rawImagePixels[byteIndex++];
             alphaTotal += rawImagePixels[byteIndex++];
         }*/
-        
+        /*
         NSMutableArray *values = [NSMutableArray array];
         
         for (NSUInteger currentPixel = 0; currentPixel < totalNumberOfPixels; currentPixel++) {
@@ -210,7 +211,6 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
             NSUInteger green = rawImagePixels[byteIndex++];
             NSUInteger blue = rawImagePixels[byteIndex++];
             NSUInteger alpha = rawImagePixels[byteIndex++];
-            
             GLKVector3 vector = GLKVector3Make(red, green, blue);
             NSValue *closestValue = nil;
             float minimalDistance = INTMAX_MAX;
@@ -250,7 +250,6 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
                 maxCount = otherVector.count;
             }
         }
-        
         static const int diff = 90;
         if (fabs(vector.r - vector.g) > diff ||
             fabs(vector.r - vector.b) > diff ||
@@ -258,16 +257,7 @@ NSString *const kGPUImageColorAveragingFragmentShaderString = SHADER_STRING
             ) {
             self.colorAverageProcessingFinishedBlock(vector.r /255.f, vector.g / 255.f, vector.b / 255.f, 1.f, frameTime);
         }
-        
-        CGFloat normalizedRedTotal = (CGFloat)redTotal / (CGFloat)totalNumberOfPixels / 255.0;
-        CGFloat normalizedGreenTotal = (CGFloat)greenTotal / (CGFloat)totalNumberOfPixels / 255.0;
-        CGFloat normalizedBlueTotal = (CGFloat)blueTotal / (CGFloat)totalNumberOfPixels / 255.0;
-        CGFloat normalizedAlphaTotal = (CGFloat)alphaTotal / (CGFloat)totalNumberOfPixels / 255.0;
-        
-        if (_colorAverageProcessingFinishedBlock != NULL)
-        {
-            //_colorAverageProcessingFinishedBlock(normalizedRedTotal, normalizedGreenTotal, normalizedBlueTotal, normalizedAlphaTotal, frameTime);
-        }
+        */
     });
 }
 

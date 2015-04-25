@@ -77,13 +77,13 @@ NSString *const kGPUImageMotionComparisonFragmentShaderString = SHADER_STRING
     
     __unsafe_unretained GPUImageMotionDetector *weakSelf = self;
 
-    [averageColor setColorAverageProcessingFinishedBlock:^(CGFloat redComponent, CGFloat greenComponent, CGFloat blueComponent, CGFloat alphaComponent, CMTime frameTime) {
+    /*[averageColor setColorAverageProcessingFinishedBlock:^(CGFloat redComponent, CGFloat greenComponent, CGFloat blueComponent, CGFloat alphaComponent, CMTime frameTime) {
         if (weakSelf.motionDetectionBlock != NULL)
         {
             weakSelf.motionDetectionBlock(CGPointMake(redComponent / alphaComponent, greenComponent / alphaComponent), alphaComponent, frameTime);
         }
 //        NSLog(@"Average X: %f, Y: %f total: %f", redComponent / alphaComponent, greenComponent / alphaComponent, alphaComponent);
-    }];
+    }];*/
     
     [frameComparisonFilter addTarget:averageColor];
     
